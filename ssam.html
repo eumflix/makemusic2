@@ -4969,7 +4969,7 @@ function evFormSetup() {
   return '<details class="evteach"' + (EV.formOpen ? ' open' : '') + '><summary>선생님 · 구글폼으로 결과 받기</summary>' +
     '<ol class="evp"><li>구글폼에서 <b>장문형 질문 하나</b>를 만들고 저장하세요. (질문 제목은 「제출 코드」)</li><li>폼 화면의 「응답자 링크 복사」를 눌러 주소를 복사하고, 아래에 붙여 넣으세요.</li><li>「학생용 주소 만들기」를 누르고, 나온 주소를 학생들에게 알려 주세요.</li><li>응답이 쌓이면 <b>제출 코드 열</b>을 복사해 ' + (EV.formOpen ? '<a href="ssam-report.html" target="_blank" rel="noopener">교사용 평가 분석툴</a>' : '교사용 평가 분석툴') + '에 붙여 넣으세요.</li></ol>' +
     '<textarea id="evFormLink" rows="2" placeholder="구글폼 주소를 붙여 넣어요 (https://forms.gle/… 또는 …/viewform)">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea><div><button class="btn sm" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div>' +
-    '<details class="evadv"><summary>고급: 폼에 코드가 자동으로 채워지게 하기 (양식 미리 작성)</summary><p class="evp">폼 우측 상단 ⋮ → 「양식 미리 작성」에서 제출 코드 질문에 <b>제출코드</b>라고 적고 「링크 받기」로 만든 주소를 위 칸에 붙여 넣어요. 그러면 학생이 「폼 열기」를 눌렀을 때 코드가 이미 채워져 있어요. 폼 설정에서 로그인 요구와 응답 1회 제한은 꺼 두세요.</p></details></details>' + evDecoderBox();
+    '<details class="evadv"><summary>고급: 학생 자동 제출 설정 (선택)</summary><p class="evp">설정하면 학생이 「제출」을 누르는 순간 코드가 선생님 폼으로 <b>자동 전송</b>돼요. 학생이 복사·붙여넣기를 하지 않아요.</p><ol class="evp"><li>구글폼 오른쪽 위 <b>⋮ → 「양식 미리 작성」</b>을 눌러요.</li><li>장문형 질문 칸에 <b>제출코드</b>라고 적고, 맨 아래 <b>「링크 받기」</b>를 눌러요.</li><li>나온 주소를 위 칸에 붙여 넣고 「학생용 주소 만들기」를 다시 눌러요. (「✓ 자동 제출이 켜졌어요」가 보이면 성공)</li><li>폼 설정에서 <b>로그인 요구</b>와 <b>응답 1회 제한</b>은 꺼 두세요.</li></ol></details></details>' + evDecoderBox();
 }
 const EVLV = { 2: ['레벨2', '코드 진행 + 멜로디. 비화성음 없이, 코드 음만 써요.'], 3: ['레벨3', '레벨2 + 비화성음(코드 밖의 지나가는 음)을 쓸 수 있어요.'], 4: ['레벨4', '레벨3 + 도약 제한(앞뒤 음과 너무 멀리 뛰지 않기).'] };
 function evalSave() {
@@ -5180,7 +5180,7 @@ function EVAL_BOOT() {
     const out = $('evFormOut'), raw = ($('evFormLink') || {}).value || '', f = formParse(raw); EV.formLink = raw; EV.formOpen = true;
     if (!f) { EV.formOut = '<p class="evp evwarn">' + (/\/forms\/d\/(?!e\/)/.test(raw) ? '이 주소는 폼을 고치는 주소예요. 「응답자 링크 복사」로 복사한 주소를 붙여 넣어 주세요.' : '구글폼 주소가 아니에요. 「응답자 링크 복사」로 복사한 주소(https://forms.gle/… 또는 …/viewform)를 붙여 넣어 주세요.') + '</p>'; out.innerHTML = EV.formOut; return; }
     const url = location.href.split('#')[0].split('?')[0] + '?f=' + formEnc(f), filled = Object.values(f.map).includes('code');
-    EV.formOut = '<p class="evp">✓ 연결됐어요 · ' + (filled ? '학생이 폼을 열면 제출 코드가 미리 채워져요' : '학생이 폼에 제출 코드를 붙여 넣어요') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><div class="evbtns"><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button><button class="btn sm" type="button" data-evf="qr">▦ QR 코드 보기</button></div>';
+    EV.formOut = '<p class="evp">✓ 연결됐어요 · ' + (filled ? '✓ 자동 제출이 켜졌어요 · 학생이 제출하면 코드가 폼으로 바로 전송돼요' : '학생이 코드를 복사해 폼에 붙여 넣어요') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><div class="evbtns"><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button><button class="btn sm" type="button" data-evf="qr">▦ QR 코드 보기</button></div>';
     out.innerHTML = EV.formOut;
   });
   $('evalStart').addEventListener('input', e => { if (e.target.id === 'evFormLink') EV.formLink = e.target.value; if (e.target.id === 'evClass') EV.klass = e.target.value;
@@ -5219,7 +5219,6 @@ function showEvalStart() {
   const c = EV.cfg;
   el.innerHTML = '<h2>작곡 평가</h2>' + '<p class="evp">이름을 적고, 평가할 레벨을 골라요. 평가가 시작되면 모든 건반과 코드가 열려 있고, 다른 화면(탭·앱)으로 나갔다 오면 횟수와 시간이 선생님께 보고돼요.  끝날 때까지 경고나 안내가 나오지 않아요. 규칙은 화면에 계속 보여요. 모두 완성하면 「제출」 버튼이 나타나요.</p>' +
     '<label class="evl">이름 (학번 포함)<input id="evName" type="text" maxlength="30" placeholder="예) 3학년 2반 5번 홍길동" value="' + EV.name.replace(/"/g, '&quot;') + '"></label>' +
-    '<label class="evl">반 (선생님이 알려준 것, 없으면 비워도 돼요)<input id="evClass" type="text" maxlength="30" placeholder="예) 3-2" value="' + EV.klass.replace(/"/g, '&quot;') + '"></label>' +
     '<div class="evl">평가 레벨</div><div class="evlv">' + [2, 3, 4].map(l => '<button type="button" class="evcard" data-ev="lv" data-v="' + l + '" aria-pressed="' + (c.lv === l) + '"><b>' + EVLV[l][0] + '</b><span>' + EVLV[l][1] + '</span></button>').join('') + '</div>' +
     '<div class="evl">마디 수</div><div class="seg" id="evBars">' + [8, 16, 32].map(n => '<button type="button" data-ev="bars" data-v="' + n + '" aria-pressed="' + (c.bars === n) + '">' + n + '마디</button>').join('') + '</div>' +
     (c.lv >= 3 ? '<label class="evl">비화성음 · 2번째 음 (곡 전체)<select id="evNcA">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (c.ncA === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select></label><label class="evl">비화성음 · 4번째 음 (곡 전체)<select id="evNcB">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (c.ncB === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select></label>' : '') +
@@ -5361,7 +5360,8 @@ async function evalSubmit() {
   try {
     if (EV.db && EV.uid) { await EV.db.doc('submissions/' + EV.uid).set(rep); sent = true; }
   } catch (e) { sent = false; }
-  S.submitted = { text: rep.code, sent, at: rep.at, name: rep.name, form: !!EV.form }; EV.busy = false; save(); renderAll();
+  let auto = false; if (!sent && evFormFilled()) auto = await evFormPost(rep.code);
+  S.submitted = { text: rep.code, sent, auto, at: rep.at, name: rep.name, form: !!EV.form }; EV.busy = false; save(); renderAll();
 }
 function evFormOpenUrl() {         // 선생님 구글폼 주소 (제출 코드 칸이 미리 작성돼 있으면 코드를 채워서)
   const f = EV.form, t = S.submitted && S.submitted.text; if (!f) return '';
@@ -5369,6 +5369,13 @@ function evFormOpenUrl() {         // 선생님 구글폼 주소 (제출 코드 
   const v = { code: t, name: S.name, klass: S.klass || '' }, q = [];
   Object.entries(f.map).forEach(([no, key]) => { if (v[key]) q.push('entry.' + no + '=' + encodeURIComponent(v[key])); });
   return 'https://docs.google.com/forms/d/e/' + f.id + '/viewform' + (q.length ? '?usp=pp_url&' + q.join('&') : '');
+}
+async function evFormPost(t) {       // 자동 제출: 폼 응답 주소로 직접 전송 (결과는 확인 불가라 no-cors)
+  const f = EV.form; if (!f || f.u) return false;
+  const fd = new FormData(), v = { code: t, name: S.name, klass: S.klass || '' }; let n = 0;
+  Object.entries(f.map).forEach(([no, key]) => { if (v[key]) { fd.append('entry.' + no, v[key]); n++; } });
+  if (!n) return false;
+  try { await fetch('https://docs.google.com/forms/d/e/' + f.id + '/formResponse', { method: 'POST', mode: 'no-cors', body: fd }); return true; } catch (e) { return false; }
 }
 const evFormFilled = () => !!(EV.form && !EV.form.u && Object.values(EV.form.map).includes('code'));
 async function evalCopy() {
@@ -5387,6 +5394,7 @@ function renderEvalSubmit() {
     const s = S.submitted, fu = evFormOpenUrl();
     el.hidden = false; el.className = 'levelup evdone';
     if (s.sent) el.innerHTML = '<div><b>✓ 선생님께 제출했어요</b><p>수고했어요! 이제 창을 닫아도 돼요.</p></div>';
+    else if (s.auto) el.innerHTML = '<div><b>✓ 선생님께 제출했어요</b><p>수고했어요! 혹시 몰라서 아래 코드는 복사해 두세요.</p><div class="evbtns"><button class="btn" type="button" data-ev="copy">📋 코드 복사</button></div><p class="lbl" id="evMsg"></p><textarea id="evText" readonly rows="2">' + String(s.text).replace(/</g, '&lt;') + '</textarea></div>';
     else el.innerHTML = '<div><b>✓ 평가를 마쳤어요</b><p>아래 <b>제출 코드</b>를 복사해서 선생님께 제출해요.</p><div class="evbtns"><button class="btn pri" type="button" data-ev="copy">📋 코드 복사</button>' +
       (fu ? '<button class="btn" type="button" data-ev="openform">📝 ' + (evFormFilled() ? '코드가 채워진 폼 열기' : '선생님 폼 열기') + '</button>' : '') + '</div><p class="lbl" id="evMsg"></p><textarea id="evText" readonly rows="3">' + String(s.text).replace(/</g, '&lt;') + '</textarea></div>';
     el.querySelector('div').insertAdjacentHTML('beforeend', '<p><button class="textbtn" type="button" data-ev="again">새 평가 시작하기 (다른 학생용)</button></p>');
@@ -5394,7 +5402,7 @@ function renderEvalSubmit() {
   }
   if (!done) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false; el.className = 'levelup';
-  el.innerHTML = '<div><b>모두 완성했어요</b><p>다 만들었으면 제출해요. 제출하면 고칠 수 없어요.</p></div><button class="btn pri" type="button" data-ev="submit"' + (EV.busy ? ' disabled' : '') + '>' + (EV.busy ? '만드는 중…' : ((EV.db && EV.uid) ? '교사에게 제출' : '제출 코드 만들기')) + '</button>';
+  el.innerHTML = '<div><b>모두 완성했어요</b><p>다 만들었으면 제출해요. 제출하면 고칠 수 없어요.</p></div><button class="btn pri" type="button" data-ev="submit"' + (EV.busy ? ' disabled' : '') + '>' + (EV.busy ? '만드는 중…' : ((EV.db && EV.uid) || evFormFilled() ? '선생님께 제출' : '제출 코드 만들기')) + '</button>';
 }
 /* ---------- 교사용 목록 ---------- */
 async function loadTeacher() {
