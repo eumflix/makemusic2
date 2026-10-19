@@ -422,6 +422,7 @@ body[data-mode="l0"] #levelup:not([hidden]){display:none!important}
 .evalstart h2{margin:0 0 8px;font-size:20px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .evalstart .evp{font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 14px}
 .evl{display:block;font-size:13.5px;font-weight:600;margin:14px 0 6px}
+.evteacher .evp{font-size:16px;line-height:1.65;color:var(--ink)}.evteacher .evl{font-size:16px;margin:20px 0 8px}.evteacher h2{font-size:22px}.evteacher .evcard span{font-size:14.5px}.evteacher .seg button{font-size:16px}.evteacher h2 small{display:block;margin-top:4px;font-size:15px;font-weight:500;color:var(--muted)}.evteacher textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}.evteacher .btn{font-size:16px;padding:12px 18px}.evteacher .evl select{font-size:16px}.evteacher .evadv{margin:14px 0}.evteacher .evadv>summary{list-style:none;display:inline-block;cursor:pointer;font-size:15px;font-weight:600;padding:10px 16px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}.evteacher .evadv>summary::-webkit-details-marker{display:none}.evteacher .evadv>summary::after{content:' ▾'}.evteacher .evadv[open]>summary::after{content:' ▴'}.evteacher .evadv[open]>summary{background:var(--line)}.evteacher #evFormUrl{font-size:14px}
 .evl input,.evl select{display:block;width:100%;margin-top:6px;padding:10px 12px;font:inherit;font-size:15px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
 .evlv{display:grid;gap:8px}
 .evcard{text-align:left;display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;cursor:pointer}
@@ -4977,15 +4978,15 @@ function evDecoderBox() {
 const evCfgTxt = c => '레벨 ' + c.lv + ' · ' + c.bars + '마디' + (c.lv >= 3 ? ' · 비화성음 ' + ncCapTxt(c.ncA) + '/' + ncCapTxt(c.ncB) : '') + (c.lv === 4 ? ' · ' + (c.leap + 2) + '도 이상 도약 금지' : '');
 function evTeacherHtml() {
   const c = EV.cfg, capSel = (id, cur) => '<select id="' + id + '">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select>';
-  return '<h2>평가 만들기 <small>(선생님용)</small></h2><p class="evp">평가 설정을 고르고 「학생용 주소 만들기」를 누르세요. 학생들은 그 주소(또는 QR)로 들어와서 이름만 적고 시작해요.</p>' +
+  return '<div class="evteacher"><h2>나도 작곡가 평가 링크 만들기 <small>(선생님용)</small></h2><p class="evp">평가 설정을 고르고 「학생용 주소 만들기」를 누르세요. 학생들은 그 주소(또는 QR)로 들어와서 이름만 적고 시작해요.</p>' +
     '<div class="evl">평가 레벨</div><div class="evlv">' + [2, 3, 4].map(l => '<button type="button" class="evcard" data-ev="lv" data-v="' + l + '" aria-pressed="' + (c.lv === l) + '"><b>' + EVLV[l][0] + '</b><span>' + EVLV[l][1] + '</span></button>').join('') + '</div>' +
     '<div class="evl">마디 수</div><div class="seg" id="evBars">' + [8, 16, 32].map(n => '<button type="button" data-ev="bars" data-v="' + n + '" aria-pressed="' + (c.bars === n) + '">' + n + '마디</button>').join('') + '</div>' +
     (c.lv >= 3 ? '<label class="evl">비화성음 · 2번째 음 (곡 전체)' + capSel('evNcA', c.ncA) + '</label><label class="evl">비화성음 · 4번째 음 (곡 전체)' + capSel('evNcB', c.ncB) + '</label>' : '') +
     (c.lv === 4 ? '<label class="evl">도약 금지<select id="evLeap">' + [2, 3, 4, 5, 6].map(v => '<option value="' + v + '"' + (c.leap === v ? ' selected' : '') + '>' + (v + 2) + '도 이상 도약 금지</option>').join('') + '</select></label>' : '') +
-    '<div class="evl">구글폼 주소 <small>(선택)</small></div><p class="evp">구글폼에서 <b>장문형 질문 하나</b>를 만들고 저장하세요. 폼 화면의 「응답자 링크 복사」로 복사한 주소를 아래에 붙여 넣어요. 폼을 쓰지 않으면 비워 두세요.</p>' +
-    '<textarea id="evFormLink" rows="2" placeholder="https://forms.gle/… 또는 …/viewform">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea>' +
-    '<details class="evadv"><summary>고급: 학생 자동 제출 설정 (선택)</summary><p class="evp">설정하면 학생이 「제출」을 누르는 순간 코드가 선생님 폼으로 <b>자동 전송</b>돼요. 학생이 복사·붙여넣기를 하지 않아요.</p><ol class="evp"><li>구글폼 오른쪽 위 <b>⋮ → 「양식 미리 작성」</b>을 눌러요.</li><li>장문형 질문 칸에 <b>제출코드</b>라고 적고, 맨 아래 <b>「링크 받기」</b>를 눌러요.</li><li>나온 주소를 위 칸에 붙여 넣어요. (「자동 제출이 켜졌어요」가 보이면 성공)</li><li>폼 설정에서 <b>로그인 요구</b>와 <b>응답 1회 제한</b>은 꺼 두세요.</li></ol></details>' +
-    '<div class="evgo"><button class="btn pri" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div>' + evDecoderBox();
+    '<div class="evl">구글폼 주소</div><p class="evp">구글폼에서 <b>장문형 질문 하나</b>를 만들고 저장하세요. 폼 화면의 「응답자 링크 복사」로 복사한 주소를 아래에 붙여 넣으세요.</p>' +
+    '<textarea id="evFormLink" rows="2" placeholder="여기에 구글폼 주소를 붙여 넣으세요">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea>' +
+    '<details class="evadv"><summary>⚙ 고급 설정 · 학생 자동 제출</summary><p class="evp">설정하면 학생이 「제출」을 누르는 순간 코드가 선생님 폼으로 <b>자동 전송</b>돼요. 학생이 복사·붙여넣기를 하지 않아요.</p><ol class="evp"><li>구글폼 오른쪽 위 <b>⋮ → 「양식 미리 작성」</b>을 눌러요.</li><li>장문형 질문 칸에 <b>제출코드</b>라고 적고, 맨 아래 <b>「링크 받기」</b>를 눌러요.</li><li>나온 주소를 위 칸에 붙여 넣어요. (「자동 제출이 켜졌어요」가 보이면 성공)</li><li>폼 설정에서 <b>로그인 요구</b>와 <b>응답 1회 제한</b>은 꺼 두세요.</li></ol></details>' +
+    '<div class="evgo"><button class="btn pri" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div>' + evDecoderBox() + '</div>';
 }
 function evFormSetup() {      // 학생 화면의 안내
   if (EV.form && evFormFilled()) return '<p class="evp">모두 완성하고 「제출」을 누르면 선생님께 전달돼요.</p>';
@@ -5206,7 +5207,7 @@ function EVAL_BOOT() {
     const f = raw ? formParse(raw) : null;
     if (raw && !f) { EV.formOut = '<p class="evp evwarn">' + (/\/forms\/d\/(?!e\/)/.test(raw) ? '이 주소는 폼을 고치는 주소예요. 「응답자 링크 복사」로 복사한 주소를 붙여 넣어 주세요.' : '구글폼 주소가 아니에요. 「응답자 링크 복사」로 복사한 주소(https://forms.gle/… 또는 …/viewform)를 붙여 넣어 주세요.') + '</p>'; out.innerHTML = EV.formOut; return; }
     const c = EV.cfg, url = location.href.split('#')[0].split('?')[0] + '?c=' + evUrlEnc(c, f), filled = !!(f && Object.values(f.map).includes('code'));
-    EV.formOut = '<p class="evp">✓ 학생용 주소가 만들어졌어요 · ' + evCfgTxt(c) + '<br>' + (filled ? '자동 제출이 켜졌어요. 학생이 제출하면 코드가 폼으로 바로 전송돼요.' : f ? '학생이 코드를 복사해 폼에 붙여 넣어요.' : '구글폼 없이 만들었어요. 학생이 코드를 복사해 선생님이 정한 곳에 붙여 넣어요.') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><div class="evbtns"><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button><button class="btn sm" type="button" data-evf="qr">▦ QR 코드 보기</button></div>';
+    EV.formOut = '<p class="evp">✓ 학생용 주소가 만들어졌어요 · ' + evCfgTxt(c) + '<br>' + (filled ? '자동 제출이 켜졌어요. 학생이 제출하면 코드가 폼으로 바로 전송돼요.' : f ? '학생이 코드를 복사해 폼에 붙여 넣어요.' : '구글폼 주소가 없어서 「코드 복사」만 되는 주소예요.') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><div class="evbtns"><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button><button class="btn sm" type="button" data-evf="qr">▦ QR 코드 보기</button></div>';
     out.innerHTML = EV.formOut;
   });
   $('evalStart').addEventListener('input', e => { if (e.target.id === 'evFormLink') EV.formLink = e.target.value; if (e.target.id === 'evClass') EV.klass = e.target.value;
