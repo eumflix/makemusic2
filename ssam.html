@@ -4932,7 +4932,7 @@ $('l0').addEventListener('change', e => {
 /* ================= 평가 전용 (EVAL 빌드에서만 쓰임) ================= */
 const EVKEY = 'madi-eval-v1';
 const TEACHER_EMAIL = '';                      // 교사 메일 주소를 넣으면 제출 화면에 「메일로 보내기」 버튼이 생겨요
-const EV = { uid: null, cfg: { lv: 3, bars: 8, ncA: 2, ncB: 2, leap: 3 }, name: '', klass: '', db: null, canTeach: false, mode: 'start', list: null, busy: false, web: !(window.claude && claude.use), form: null, formLink: '', formOut: '', formOpen: false };
+const EV = { uid: null, cfg: { lv: 3, bars: 8, ncA: 2, ncB: 2, leap: 3 }, name: '', klass: '', db: null, canTeach: false, mode: 'start', list: null, busy: false, web: !(window.claude && claude.use), fixed: false, form: null, formLink: '', formOut: '', formOpen: false };
 /* ---------- 구글폼 제출 (Claude 공유 링크 밖, 예: GitHub 배포본) ----------
    선생님이 구글폼의 「양식 미리 작성」 링크를 붙여 넣으면 문항 번호(entry.123…)와 미리 적은 낱말(이름·반·총점…)을 읽어 연결하고,
    학생용 주소(?f=…)를 만들어요. 학생이 제출하면 결과가 …/formResponse 로 전송돼 선생님 응답 시트에 쌓여요. */
@@ -4960,16 +4960,37 @@ function formDec(q) {
   } catch (e) {}
   return null;
 }
+const evUrlEnc = (c, f) => { const o = { v: c.lv, b: c.bars, a: c.ncA, n: c.ncB, l: c.leap }; if (f) { if (f.u) o.u = f.u; else { o.i = f.id; o.m = f.map; } } return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+function evUrlDec(q) {
+  try {
+    const j = JSON.parse(decodeURIComponent(escape(atob(String(q).replace(/-/g, '+').replace(/_/g, '/')))));
+    if (![2, 3, 4].includes(j.v) || ![8, 16, 32].includes(j.b) || !NC_CAPS.includes(j.a) || !NC_CAPS.includes(j.n) || ![2, 3, 4, 5, 6].includes(j.l)) return null;
+    let form = null;
+    if (typeof j.u === 'string' && /^https:\/\/forms\.gle\/[\w-]+/.test(j.u)) form = { u: j.u, id: null, map: {} };
+    else if (typeof j.i === 'string' && /^[\w-]+$/.test(j.i) && j.m && typeof j.m === 'object') form = { id: j.i, map: j.m };
+    return { cfg: { lv: j.v, bars: j.b, ncA: j.a, ncB: j.n, leap: j.l }, form };
+  } catch (e) { return null; }
+}
 function evDecoderBox() {
   return EV.formOpen ? '<p class="evp"><b>📥 제출 코드를 받았다면</b> → <a href="ssam-report.html" target="_blank" rel="noopener">교사용 평가 분석툴 열기</a></p>' : '';
 }
-function evFormSetup() {
+const evCfgTxt = c => '레벨 ' + c.lv + ' · ' + c.bars + '마디' + (c.lv >= 3 ? ' · 비화성음 ' + ncCapTxt(c.ncA) + '/' + ncCapTxt(c.ncB) : '') + (c.lv === 4 ? ' · ' + (c.leap + 2) + '도 이상 도약 금지' : '');
+function evTeacherHtml() {
+  const c = EV.cfg, capSel = (id, cur) => '<select id="' + id + '">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select>';
+  return '<h2>평가 만들기 <small>(선생님용)</small></h2><p class="evp">평가 설정을 고르고 「학생용 주소 만들기」를 누르세요. 학생들은 그 주소(또는 QR)로 들어와서 이름만 적고 시작해요.</p>' +
+    '<div class="evl">평가 레벨</div><div class="evlv">' + [2, 3, 4].map(l => '<button type="button" class="evcard" data-ev="lv" data-v="' + l + '" aria-pressed="' + (c.lv === l) + '"><b>' + EVLV[l][0] + '</b><span>' + EVLV[l][1] + '</span></button>').join('') + '</div>' +
+    '<div class="evl">마디 수</div><div class="seg" id="evBars">' + [8, 16, 32].map(n => '<button type="button" data-ev="bars" data-v="' + n + '" aria-pressed="' + (c.bars === n) + '">' + n + '마디</button>').join('') + '</div>' +
+    (c.lv >= 3 ? '<label class="evl">비화성음 · 2번째 음 (곡 전체)' + capSel('evNcA', c.ncA) + '</label><label class="evl">비화성음 · 4번째 음 (곡 전체)' + capSel('evNcB', c.ncB) + '</label>' : '') +
+    (c.lv === 4 ? '<label class="evl">도약 금지<select id="evLeap">' + [2, 3, 4, 5, 6].map(v => '<option value="' + v + '"' + (c.leap === v ? ' selected' : '') + '>' + (v + 2) + '도 이상 도약 금지</option>').join('') + '</select></label>' : '') +
+    '<div class="evl">구글폼 주소 <small>(선택)</small></div><p class="evp">구글폼에서 <b>장문형 질문 하나</b>를 만들고 저장하세요. 폼 화면의 「응답자 링크 복사」로 복사한 주소를 아래에 붙여 넣어요. 폼을 쓰지 않으면 비워 두세요.</p>' +
+    '<textarea id="evFormLink" rows="2" placeholder="https://forms.gle/… 또는 …/viewform">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea>' +
+    '<details class="evadv"><summary>고급: 학생 자동 제출 설정 (선택)</summary><p class="evp">설정하면 학생이 「제출」을 누르는 순간 코드가 선생님 폼으로 <b>자동 전송</b>돼요. 학생이 복사·붙여넣기를 하지 않아요.</p><ol class="evp"><li>구글폼 오른쪽 위 <b>⋮ → 「양식 미리 작성」</b>을 눌러요.</li><li>장문형 질문 칸에 <b>제출코드</b>라고 적고, 맨 아래 <b>「링크 받기」</b>를 눌러요.</li><li>나온 주소를 위 칸에 붙여 넣어요. (「자동 제출이 켜졌어요」가 보이면 성공)</li><li>폼 설정에서 <b>로그인 요구</b>와 <b>응답 1회 제한</b>은 꺼 두세요.</li></ol></details>' +
+    '<div class="evgo"><button class="btn pri" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div>' + evDecoderBox();
+}
+function evFormSetup() {      // 학생 화면의 안내
+  if (EV.form && evFormFilled()) return '<p class="evp">모두 완성하고 「제출」을 누르면 선생님께 전달돼요.</p>';
   if (EV.form) return '<p class="evp">✓ 선생님 구글폼이 연결돼 있어요. 평가를 마치면 제출 코드를 복사해서 폼에 붙여 넣어요.</p>';
-  if (!EV.web) return '';
-  return '<details class="evteach"' + (EV.formOpen ? ' open' : '') + '><summary>선생님 · 구글폼으로 결과 받기</summary>' +
-    '<ol class="evp"><li>구글폼에서 <b>장문형 질문 하나</b>를 만들고 저장하세요. (질문 제목은 「제출 코드」)</li><li>폼 화면의 「응답자 링크 복사」를 눌러 주소를 복사하고, 아래에 붙여 넣으세요.</li><li>「학생용 주소 만들기」를 누르고, 나온 주소를 학생들에게 알려 주세요.</li><li>응답이 쌓이면 <b>제출 코드 열</b>을 복사해 ' + (EV.formOpen ? '<a href="ssam-report.html" target="_blank" rel="noopener">교사용 평가 분석툴</a>' : '교사용 평가 분석툴') + '에 붙여 넣으세요.</li></ol>' +
-    '<textarea id="evFormLink" rows="2" placeholder="구글폼 주소를 붙여 넣어요 (https://forms.gle/… 또는 …/viewform)">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea><div><button class="btn sm" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div>' +
-    '<details class="evadv"><summary>고급: 학생 자동 제출 설정 (선택)</summary><p class="evp">설정하면 학생이 「제출」을 누르는 순간 코드가 선생님 폼으로 <b>자동 전송</b>돼요. 학생이 복사·붙여넣기를 하지 않아요.</p><ol class="evp"><li>구글폼 오른쪽 위 <b>⋮ → 「양식 미리 작성」</b>을 눌러요.</li><li>장문형 질문 칸에 <b>제출코드</b>라고 적고, 맨 아래 <b>「링크 받기」</b>를 눌러요.</li><li>나온 주소를 위 칸에 붙여 넣고 「학생용 주소 만들기」를 다시 눌러요. (「✓ 자동 제출이 켜졌어요」가 보이면 성공)</li><li>폼 설정에서 <b>로그인 요구</b>와 <b>응답 1회 제한</b>은 꺼 두세요.</li></ol></details></details>' + evDecoderBox();
+  return '';
 }
 const EVLV = { 2: ['레벨2', '코드 진행 + 멜로디. 비화성음 없이, 코드 음만 써요.'], 3: ['레벨3', '레벨2 + 비화성음(코드 밖의 지나가는 음)을 쓸 수 있어요.'], 4: ['레벨4', '레벨3 + 도약 제한(앞뒤 음과 너무 멀리 뛰지 않기).'] };
 function evalSave() {
@@ -5156,7 +5177,11 @@ function COLLECT_BOOT() {
 }
 /* ==== /COLLECTOR ==== */
 function EVAL_BOOT() {
-  try { const q = new URLSearchParams(location.search).get('f'); if (q) EV.form = formDec(q); } catch (e) {}
+  try {
+    const sp = new URLSearchParams(location.search), c = sp.get('c'), f = sp.get('f');
+    if (c) { const d = evUrlDec(c); if (d) { EV.fixed = true; EV.cfg = d.cfg; EV.form = d.form; } }
+    else if (f) { EV.form = formDec(f); EV.fixed = true; }      // 옛 주소(설정 없음): 기본 설정으로
+  } catch (e) {}
   document.body.dataset.eval = '1'; S.evalOpen = true; S.showHint = false;
   document.querySelector('h1').textContent = '나도 작곡가 · 평가';
   let j = null; try { j = JSON.parse(localStorage.getItem(EVKEY) || 'null'); } catch (e) {}
@@ -5169,7 +5194,7 @@ function EVAL_BOOT() {
     S.submitted = j.submitted || null; S.startedAt = j.startedAt || null; S.klass = String(j.klass || '').slice(0, 30); EV.klass = S.klass; S.away = j.away && j.away.n >= 0 ? { n: +j.away.n || 0, ms: +j.away.ms || 0 } : { n: 0, ms: 0 }; S.started = true; S.hist = []; S.lastPut = null; S.planSel = 0; fixPlanSel(); resetSel();
     if (j.selBar != null && S.phase === 'write') { S.selBar = clamp(+j.selBar || 0, 0, S.bars - 1); fixSel(); }
   } else S.started = false;
-  try { if (new URLSearchParams(location.search).has('setup')) { S.started = false; EV.formOpen = true; } } catch (e) {}      // ssam.html?setup=1 : 진행 중인 평가가 있어도 선생님 설정 화면을 바로 열어요
+  if (EV.web && !EV.fixed) { S.started = false; EV.formOpen = true; }      // 학생용 주소 없이 열면 선생님 화면      // ssam.html?setup=1 : 진행 중인 평가가 있어도 선생님 설정 화면을 바로 열어요
   setBodyMode(); renderAll(); evalWatchAway();
   $('levelup').addEventListener('click', e => { const a = e.target.closest('[data-ev]'); if (a) evalAct(a.dataset.ev); });
   $('evalStart').addEventListener('click', e => { const a = e.target.closest('[data-ev]'); if (a) evalAct(a.dataset.ev, a); });
@@ -5177,15 +5202,16 @@ function EVAL_BOOT() {
     const a = e.target.closest('[data-evf]'); if (!a) return;
     if (a.dataset.evf === 'qr') { const t = $('evFormUrl'); if (t) openQR(t.value, '나도 작곡가 평가', '학생들이 휴대폰 카메라로 비추면 평가 화면이 열려요.'); return; }
     if (a.dataset.evf === 'copy') { const t = $('evFormUrl'); if (t) { t.select(); try { navigator.clipboard.writeText(t.value); flash('학생용 주소를 복사했어요'); } catch (_) { document.execCommand('copy'); } } return; }
-    const out = $('evFormOut'), raw = ($('evFormLink') || {}).value || '', f = formParse(raw); EV.formLink = raw; EV.formOpen = true;
-    if (!f) { EV.formOut = '<p class="evp evwarn">' + (/\/forms\/d\/(?!e\/)/.test(raw) ? '이 주소는 폼을 고치는 주소예요. 「응답자 링크 복사」로 복사한 주소를 붙여 넣어 주세요.' : '구글폼 주소가 아니에요. 「응답자 링크 복사」로 복사한 주소(https://forms.gle/… 또는 …/viewform)를 붙여 넣어 주세요.') + '</p>'; out.innerHTML = EV.formOut; return; }
-    const url = location.href.split('#')[0].split('?')[0] + '?f=' + formEnc(f), filled = Object.values(f.map).includes('code');
-    EV.formOut = '<p class="evp">✓ 연결됐어요 · ' + (filled ? '✓ 자동 제출이 켜졌어요 · 학생이 제출하면 코드가 폼으로 바로 전송돼요' : '학생이 코드를 복사해 폼에 붙여 넣어요') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><div class="evbtns"><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button><button class="btn sm" type="button" data-evf="qr">▦ QR 코드 보기</button></div>';
+    const out = $('evFormOut'), raw = (($('evFormLink') || {}).value || '').trim(); EV.formLink = raw; EV.formOpen = true;
+    const f = raw ? formParse(raw) : null;
+    if (raw && !f) { EV.formOut = '<p class="evp evwarn">' + (/\/forms\/d\/(?!e\/)/.test(raw) ? '이 주소는 폼을 고치는 주소예요. 「응답자 링크 복사」로 복사한 주소를 붙여 넣어 주세요.' : '구글폼 주소가 아니에요. 「응답자 링크 복사」로 복사한 주소(https://forms.gle/… 또는 …/viewform)를 붙여 넣어 주세요.') + '</p>'; out.innerHTML = EV.formOut; return; }
+    const c = EV.cfg, url = location.href.split('#')[0].split('?')[0] + '?c=' + evUrlEnc(c, f), filled = !!(f && Object.values(f.map).includes('code'));
+    EV.formOut = '<p class="evp">✓ 학생용 주소가 만들어졌어요 · ' + evCfgTxt(c) + '<br>' + (filled ? '자동 제출이 켜졌어요. 학생이 제출하면 코드가 폼으로 바로 전송돼요.' : f ? '학생이 코드를 복사해 폼에 붙여 넣어요.' : '구글폼 없이 만들었어요. 학생이 코드를 복사해 선생님이 정한 곳에 붙여 넣어요.') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><div class="evbtns"><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button><button class="btn sm" type="button" data-evf="qr">▦ QR 코드 보기</button></div>';
     out.innerHTML = EV.formOut;
   });
   $('evalStart').addEventListener('input', e => { if (e.target.id === 'evFormLink') EV.formLink = e.target.value; if (e.target.id === 'evClass') EV.klass = e.target.value;
     if (e.target.id === 'evName') { EV.name = e.target.value; const b = $('evGo'); if (b) b.disabled = !EV.name.trim(); } });
-  $('evalStart').addEventListener('change', e => { if (e.target.id === 'evNcA') { EV.cfg.ncA = +e.target.value; } if (e.target.id === 'evNcB') { EV.cfg.ncB = +e.target.value; } if (e.target.id === 'evLeap') { EV.cfg.leap = +e.target.value; } });
+  $('evalStart').addEventListener('change', e => { if (/^ev(NcA|NcB|Leap)$/.test(e.target.id)) { EV.formOut = ''; const o = $('evFormOut'); if (o) o.innerHTML = ''; } if (e.target.id === 'evNcA') { EV.cfg.ncA = +e.target.value; } if (e.target.id === 'evNcB') { EV.cfg.ncB = +e.target.value; } if (e.target.id === 'evLeap') { EV.cfg.leap = +e.target.value; } });
   (async () => {
     try {
       if (!(window.claude && claude.use)) return;
@@ -5216,13 +5242,14 @@ function showEvalStart() {
   document.body.classList.add('evalstart-on'); stopPlay();
   const el = $('evalStart'); el.hidden = false;
   if (EV.mode === 'teacher') { renderTeacher(el); return; }
-  const c = EV.cfg;
-  el.innerHTML = '<h2>작곡 평가</h2>' + '<p class="evp">이름을 적고, 평가할 레벨을 골라요. 평가가 시작되면 모든 건반과 코드가 열려 있고, 다른 화면(탭·앱)으로 나갔다 오면 횟수와 시간이 선생님께 보고돼요.  끝날 때까지 경고나 안내가 나오지 않아요. 규칙은 화면에 계속 보여요. 모두 완성하면 「제출」 버튼이 나타나요.</p>' +
+  if (EV.web && !EV.fixed) { el.innerHTML = evTeacherHtml(); return; }
+  const c = EV.cfg, pick = !EV.fixed;
+  el.innerHTML = '<h2>작곡 평가</h2>' + '<p class="evp">' + (pick ? '이름을 적고, 평가할 레벨을 골라요.' : '이름을 적고 시작해요. <b>' + evCfgTxt(c) + '</b>') + ' 평가가 시작되면 모든 건반과 코드가 열려 있고, 다른 화면(탭·앱)으로 나갔다 오면 횟수와 시간이 선생님께 보고돼요.  끝날 때까지 경고나 안내가 나오지 않아요. 규칙은 화면에 계속 보여요. 모두 완성하면 「제출」 버튼이 나타나요.</p>' +
     '<label class="evl">이름 (학번 포함)<input id="evName" type="text" maxlength="30" placeholder="예) 3학년 2반 5번 홍길동" value="' + EV.name.replace(/"/g, '&quot;') + '"></label>' +
-    '<div class="evl">평가 레벨</div><div class="evlv">' + [2, 3, 4].map(l => '<button type="button" class="evcard" data-ev="lv" data-v="' + l + '" aria-pressed="' + (c.lv === l) + '"><b>' + EVLV[l][0] + '</b><span>' + EVLV[l][1] + '</span></button>').join('') + '</div>' +
-    '<div class="evl">마디 수</div><div class="seg" id="evBars">' + [8, 16, 32].map(n => '<button type="button" data-ev="bars" data-v="' + n + '" aria-pressed="' + (c.bars === n) + '">' + n + '마디</button>').join('') + '</div>' +
-    (c.lv >= 3 ? '<label class="evl">비화성음 · 2번째 음 (곡 전체)<select id="evNcA">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (c.ncA === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select></label><label class="evl">비화성음 · 4번째 음 (곡 전체)<select id="evNcB">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (c.ncB === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select></label>' : '') +
-    (c.lv === 4 ? '<label class="evl">도약 금지<select id="evLeap">' + [2, 3, 4, 5, 6].map(v => '<option value="' + v + '"' + (c.leap === v ? ' selected' : '') + '>' + (v + 2) + '도 이상 도약 금지</option>').join('') + '</select></label>' : '') +
+    (!pick ? '' : '<div class="evl">평가 레벨</div><div class="evlv">' + [2, 3, 4].map(l => '<button type="button" class="evcard" data-ev="lv" data-v="' + l + '" aria-pressed="' + (c.lv === l) + '"><b>' + EVLV[l][0] + '</b><span>' + EVLV[l][1] + '</span></button>').join('') + '</div>' +
+    '<div class="evl">마디 수</div><div class="seg" id="evBars">' + [8, 16, 32].map(n => '<button type="button" data-ev="bars" data-v="' + n + '" aria-pressed="' + (c.bars === n) + '">' + n + '마디</button>').join('') + '</div>') +
+    (pick && c.lv >= 3 ? '<label class="evl">비화성음 · 2번째 음 (곡 전체)<select id="evNcA">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (c.ncA === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select></label><label class="evl">비화성음 · 4번째 음 (곡 전체)<select id="evNcB">' + [0, 1, 2, 3, 4, 5, 6, 8, 10, 99].map(v => '<option value="' + v + '"' + (c.ncB === v ? ' selected' : '') + '>' + ncCapTxt(v) + '</option>').join('') + '</select></label>' : '') +
+    (pick && c.lv === 4 ? '<label class="evl">도약 금지<select id="evLeap">' + [2, 3, 4, 5, 6].map(v => '<option value="' + v + '"' + (c.leap === v ? ' selected' : '') + '>' + (v + 2) + '도 이상 도약 금지</option>').join('') + '</select></label>' : '') +
     '<div class="evgo"><button class="btn pri" type="button" id="evGo" data-ev="go"' + (EV.name.trim() ? '' : ' disabled') + '>평가 시작하기</button>' + (EV.canTeach ? '<button class="btn" type="button" data-ev="teacher">교사용 · 제출 목록</button>' : '') + '</div>' + evFormSetup();
 }
 function hideEvalStart() { document.body.classList.remove('evalstart-on'); $('evalStart').hidden = true; }
@@ -5230,8 +5257,8 @@ function evalAfterRender() {
   $('sub').textContent = '평가 · ' + EVLV[S.level][0] + ' · ' + S.bars + '마디 · ' + S.name;
 }
 function evalAct(a, el) {
-  if (a === 'lv') { EV.cfg.lv = +el.dataset.v; renderAll(); }
-  else if (a === 'bars') { EV.cfg.bars = +el.dataset.v; renderAll(); }
+  if (a === 'lv') { EV.cfg.lv = +el.dataset.v; EV.formOut = ''; renderAll(); }
+  else if (a === 'bars') { EV.cfg.bars = +el.dataset.v; EV.formOut = ''; renderAll(); }
   else if (a === 'go') { if (EV.name.trim()) evalBegin(); }
   else if (a === 'teacher') { EV.mode = 'teacher'; EV.list = null; renderAll(); loadTeacher(); }
   else if (a === 'back') { EV.mode = 'start'; renderAll(); }
