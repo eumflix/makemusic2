@@ -3193,7 +3193,7 @@ function fixSel() {
   S.selBar = clamp(S.selBar || 0, 0, S.bars - 1); const m = S.mel[S.selBar];
   if (m.pat == null) S.selSlot = null; else S.selSlot = (S.selSlot == null || S.selSlot >= m.notes.length) ? Math.max(0, m.notes.indexOf(null)) : S.selSlot;
 }
-function pushHist() { S.hist.push(JSON.stringify(S.mel)); if (S.hist.length > 80) S.hist.shift(); }
+function pushHist(b, k) { S.hist.push(JSON.stringify({ m: S.mel, b: b != null ? b : S.selBar, k: k != null ? k : S.selSlot })); if (S.hist.length > 80) S.hist.shift(); }
 function checkBeginner() {
   syncRules();
   if (S.level === 1) {                       // 레벨1: 4마디 · 코드 I-IV-V-I · 리듬(2분음표 둘) 모두 정해져 있어요
@@ -4600,12 +4600,12 @@ function onKeyBG(p) {
   if (S.mel[b].pat == null) { flash('먼저 이 마디의 리듬을 골라요'); return; }
   if (k == null) k = S.selSlot = Math.max(0, S.mel[b].notes.indexOf(null));
   const r = melOptions(S, b, k), o = r.opts.get(p);
-  if (EVAL) { if (!o) return; preview(p); pushHist(); S.mel[b].notes[k] = p; S.lastPut = { b, k }; S.showHint = false; const nx = melAdvance(b, k); if (nx) { S.selBar = nx.b; S.selSlot = nx.k; } afterChange(); return; }
+  if (EVAL) { if (!o) return; preview(p); pushHist(b, k); S.mel[b].notes[k] = p; S.lastPut = { b, k }; S.showHint = false; const nx = melAdvance(b, k); if (nx) { S.selBar = nx.b; S.selSlot = nx.k; } afterChange(); return; }
   if (o && o.warn && S.level >= 2) { preview(p); S.warn = o.reason + ' 규칙에 "첫 음은 도"라고 적혀 있죠? 도(낮은 도 C4 또는 높은 도 C5)를 눌러 시작해요.'; renderStatus(); return; }
   if (!o || !o.ok) { flash(o ? o.reason : '지금은 쓸 수 없는 음이에요'); return; }
   preview(p);
   if (S.mel[b].notes.every(q => q == null)) { const a = audio(); if (a) { const v = voicing(r.chord); v.pad.forEach(q => tone(q, a.currentTime + 0.01, 1.0, 0.1)); tone(v.bass, a.currentTime + 0.01, 1.0, 0.2); } }
-  pushHist(); S.mel[b].notes[k] = p; S.lastPut = { b, k };
+  pushHist(b, k); S.mel[b].notes[k] = p; S.lastPut = { b, k };
   S.showHint = false;   // 힌트는 한 번 쓰면 꺼져요
   const nx = melAdvance(b, k); if (nx && !(visHold === b && nx.b !== b)) { S.selBar = nx.b; S.selSlot = nx.k; }
   afterChange();
@@ -4646,7 +4646,9 @@ function onRest() {
 }
 function undoBG() {
   if (!isWrite() || !S.hist.length) return;
-  S.mel = JSON.parse(S.hist.pop()); S.lastPut = null; fixSel(); afterChange();
+  const h = JSON.parse(S.hist.pop()); S.mel = h.m || h; S.lastPut = null;
+  if (h.m && h.b != null) { S.selBar = clamp(h.b, 0, S.bars - 1); S.selSlot = h.k; }      // 되돌린 음의 자리로 커서를 돌려놓는다
+  fixSel(); afterChange();
 }
 function undo() {
   if (isBG()) return undoBG();
@@ -4935,10 +4937,11 @@ const EV = { uid: null, cfg: { lv: 3, bars: 8, ncA: 2, ncB: 2, leap: 3 }, name: 
    선생님이 구글폼의 「양식 미리 작성」 링크를 붙여 넣으면 문항 번호(entry.123…)와 미리 적은 낱말(이름·반·총점…)을 읽어 연결하고,
    학생용 주소(?f=…)를 만들어요. 학생이 제출하면 결과가 …/formResponse 로 전송돼 선생님 응답 시트에 쌓여요. */
 const FORM_KEYS = [['name', ['이름', '성명', 'name']], ['klass', ['반', '학급', 'class']], ['level', ['레벨', 'level']], ['bars', ['마디', '마디수', 'bars']], ['score', ['총점', '점수', 'score']],
-  ['accChord', ['코드', '코드%', '코드정확도']], ['accNote', ['음', '음%', '음정확도']], ['accRhythm', ['리듬', '리듬%', '리듬정확도']], ['away', ['이탈', '화면이탈']], ['comment', ['총평', 'comment']], ['text', ['결과', '전문', '결과전문', 'text']], ['at', ['시각', '제출시각', 'time']]];
-const FORM_KO = { name: '이름', klass: '반', level: '레벨', bars: '마디', score: '총점', accChord: '코드%', accNote: '음%', accRhythm: '리듬%', away: '이탈', comment: '총평', text: '결과 전문', at: '제출시각' };
+  ['accChord', ['코드', '코드%', '코드정확도']], ['accNote', ['음', '음%', '음정확도']], ['accRhythm', ['리듬', '리듬%', '리듬정확도']], ['away', ['이탈', '화면이탈']], ['comment', ['총평', 'comment']], ['text', ['결과', '전문', '결과전문', 'text']], ['at', ['시각', '제출시각', 'time']], ['code', ['제출코드', '제출코드문자', 'submitcode']]];
+const FORM_KO = { name: '이름', klass: '반', level: '레벨', bars: '마디', score: '총점', accChord: '코드%', accNote: '음%', accRhythm: '리듬%', away: '이탈', comment: '총평', text: '결과 전문', at: '제출시각', code: '제출 코드' };
 function formParse(link) {
-  let u; try { u = new URL(String(link).trim()); } catch (e) { return null; }
+  const raw = String(link).trim(); let u; try { u = new URL(raw); } catch (e) { return null; }
+  if (u.hostname === 'forms.gle') return { u: raw, id: null, map: {}, unk: [] };
   const m = u.pathname.match(/\/forms\/d\/e\/([^/]+)/); if (!m) return null;
   const map = {}, unk = [];
   u.searchParams.forEach((v, k) => {
@@ -4948,23 +4951,25 @@ function formParse(link) {
   });
   return { id: m[1], map, unk };
 }
-const formEnc = f => btoa(unescape(encodeURIComponent(JSON.stringify({ i: f.id, m: f.map })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const formEnc = f => btoa(unescape(encodeURIComponent(JSON.stringify(f.u ? { u: f.u } : { i: f.id, m: f.map })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 function formDec(q) {
-  try { const j = JSON.parse(decodeURIComponent(escape(atob(String(q).replace(/-/g, '+').replace(/_/g, '/'))))); if (j && /^[\w-]+$/.test(j.i) && j.m && typeof j.m === 'object') return { id: j.i, map: j.m }; } catch (e) {}
+  try {
+    const j = JSON.parse(decodeURIComponent(escape(atob(String(q).replace(/-/g, '+').replace(/_/g, '/')))));
+    if (j && typeof j.u === 'string' && /^https:\/\/forms\.gle\/[\w-]+/.test(j.u)) return { u: j.u, id: null, map: {} };
+    if (j && /^[\w-]+$/.test(j.i) && j.m && typeof j.m === 'object') return { id: j.i, map: j.m };
+  } catch (e) {}
   return null;
 }
-async function webSendForm(rep) {
-  const f = EV.form, v = { name: rep.name, klass: rep.klass, level: rep.level, bars: rep.bars, score: rep.score, accChord: rep.accChord, accNote: rep.accNote, accRhythm: rep.accRhythm, away: rep.awayN + '회 · ' + evDur(rep.awayMs), comment: rep.comment, text: rep.text, at: rep.at };
-  const body = new URLSearchParams(); Object.entries(f.map).forEach(([no, key]) => body.append('entry.' + no, String(v[key] == null ? '' : v[key])));
-  await fetch('https://docs.google.com/forms/d/e/' + f.id + '/formResponse', { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+function evDecoderBox() {
+  return '<p class="evp"><b>📥 학생이 붙여 넣은 「제출 코드」를 받았다면</b> → <a href="collector.html" target="_blank" rel="noopener">교사용 평가 분석툴 열기</a> (코드를 붙여 넣으면 채점·보고서가 만들어져요)</p>';
 }
 function evFormSetup() {
-  if (EV.form) return '<p class="evp">✓ 구글폼으로 제출되도록 연결돼 있어요.</p>';
+  if (EV.form) return '<p class="evp">✓ 선생님 구글폼이 연결돼 있어요. 평가를 마치면 제출 코드를 복사해서 폼에 붙여 넣어요.</p>';
   if (!EV.web) return '';
   return '<details class="evteach"' + (EV.formOpen ? ' open' : '') + '><summary>선생님 · 구글폼으로 결과 받기</summary>' +
-    '<p class="evp"><b>⚡ 가장 쉬운 방법</b>: <a href="teacher.html" target="_blank" rel="noopener">구글폼 자동 만들기</a> — 코드를 한 번 붙여 넣고 실행하면 폼과 학생용 주소가 만들어져요.</p><p class="evp">이미 만든 폼이 있다면 아래 방법으로 연결해요.</p>'+
-    '<ol class="evp"><li>구글폼에 문항을 만들고(단답형·장문형), 우측 상단 ⋮ → 「양식 미리 작성」에서 문항마다 약속된 낱말을 적어요: <b>이름 · 반 · 레벨 · 마디 · 총점 · 코드 · 음 · 리듬 · 이탈 · 총평 · 결과 · 시각</b> 중 받고 싶은 것 (결과 = 곡과 틀린 곳 전문)</li><li>「링크 받기」로 만든 주소를 아래에 붙여 넣어요.</li><li>만들어진 <b>학생용 주소</b>를 학생들에게 나눠 줘요. 폼 설정에서 로그인 요구·응답 1회 제한은 꺼 두세요.</li></ol>' +
-    '<textarea id="evFormLink" rows="3" placeholder="미리 작성된 구글폼 링크를 붙여 넣어요">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea><div><button class="btn sm" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div></details>';
+    '<ol class="evp"><li>구글폼에 질문 한 칸을 만들어요 (예: 「제출 코드」 · 단답형이나 장문형). 이름 칸은 없어도 돼요. 코드 안에 이름이 들어 있어요.</li><li>폼의 「보내기」 → 링크 아이콘에서 주소를 복사해 아래에 붙여 넣고 「학생용 주소 만들기」를 눌러요.</li><li>만들어진 <b>학생용 주소</b>를 학생들에게 나눠 줘요. 학생은 평가를 마치고 「코드 복사」 → 「폼 열기」 → 붙여 넣고 제출해요.</li><li>응답 시트의 제출 코드 열을 복사해서 <a href="collector.html" target="_blank" rel="noopener">교사용 평가 분석툴</a>에 붙여 넣으면 보고서가 나와요.</li></ol>' +
+    '<textarea id="evFormLink" rows="2" placeholder="구글폼 주소를 붙여 넣어요 (https://forms.gle/… 또는 …/viewform)">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea><div><button class="btn sm" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div>' +
+    '<details class="evadv"><summary>고급: 폼에 코드가 자동으로 채워지게 하기 (양식 미리 작성)</summary><p class="evp">폼 우측 상단 ⋮ → 「양식 미리 작성」에서 제출 코드 질문에 <b>제출코드</b>라고 적고 「링크 받기」로 만든 주소를 위 칸에 붙여 넣어요. 그러면 학생이 「폼 열기」를 눌렀을 때 코드가 이미 채워져 있어요. 폼 설정에서 로그인 요구와 응답 1회 제한은 꺼 두세요.</p></details></details>' + evDecoderBox();
 }
 const EVLV = { 2: ['레벨2', '코드 진행 + 멜로디. 비화성음 없이, 코드 음만 써요.'], 3: ['레벨3', '레벨2 + 비화성음(코드 밖의 지나가는 음)을 쓸 수 있어요.'], 4: ['레벨4', '레벨3 + 도약 제한(앞뒤 음과 너무 멀리 뛰지 않기).'] };
 function evalSave() {
@@ -4979,6 +4984,177 @@ function evalBegin() {
   S.hist = []; S.lastPut = null; S.events = []; S.planSel = 0; S.planView = null; S.selBar = 0; S.selSlot = null; S.submitted = null; S.startedAt = Date.now(); S.started = true; S.away = { n: 0, ms: 0 };
   syncRules(); resetSel(); setBodyMode(); save(); window.scrollTo({ top: 0 }); renderAll();
 }
+/* ==== COLLECTOR ==== */
+/* 교사용 평가 분석툴 (collector.html): 학생 제출 코드(EV2)를 붙여 넣으면 앱과 같은 채점 엔진으로 채점하고 보고서를 만든다.
+   모든 계산은 이 브라우저 안에서만 이뤄진다 (서버 없음). */
+const COL = { recs: [], bad: [], T: { level: 3, ncA: 2, ncB: 2, leap2: 3, wc: 40 }, touched: false, sel: null, sort: 'name', score: true, text: '', ran: false };
+const colWc = lv => (lv === 2 ? 55 : 40);
+const colFmt = ms => { if (!ms) return ''; const d = new Date(ms), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '.' + p(d.getMonth() + 1) + '.' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+const colRuleTxt = T => '레벨 ' + T.level + (T.level >= 3 ? ' · 비화성음 2번째 ' + ncCapTxt(T.ncA) + ' / 4번째 ' + ncCapTxt(T.ncB) : ' · 비화성음 없음') + (T.level === 4 ? ' · ' + (T.leap2 + 2) + '도 이상 도약 금지' : '');
+const colSame = (r, T) => r.level === T.level && (T.level < 3 || (r.ncA === T.ncA && r.ncB === T.ncB)) && (T.level < 4 || r.leap2 === T.leap2);
+function colGrade(rec, T) {
+  Object.assign(S, { level: T.level, bars: rec.bars, ncA: T.ncA, ncB: T.ncB, leap2: T.leap2, chords: rec.chords, mel: rec.mel, tmode: 'major' }); syncRules();
+  const r = evalCheck(), N = rec.bars, nNote = rec.mel.reduce((a, m) => a + m.notes.length, 0);
+  const c = (N - r.chords.length) / N, n = (nNote - r.notes.length) / nNote, wc = T.wc;
+  const items = [].concat(r.chords.map(x => ({ key: 'c' + x.bar, where: x.bar + '마디 코드', what: x.chord, why: x.why, bar: x.bar, k: 0 })),
+    r.notes.map(x => ({ key: 'n' + x.bar + '-' + x.k, where: x.bar + '마디 ' + x.k + '번째 음', what: x.note, why: x.why, bar: x.bar, k: x.k })));
+  return { score: Math.round(c * wc + n * (100 - wc)), c: Math.round(c * 100), n: Math.round(n * 100), total: r.total, items, comment: evComment(items.map(x => x.why)), same: colSame(rec, T), wc };
+}
+function colShort(g) {
+  if (!g.items.length) return '규칙에 어긋난 곳이 없어요';
+  const cnt = new Map(); g.items.forEach(x => { const c = EVCAT.find(y => y[0].test(x.why)); if (c) cnt.set(c[2], (cnt.get(c[2]) || 0) + 1); });
+  const top = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0]; return top ? top[0].replace(/\(.*?\)/g, '').trim() + ' 복습' : '세부 내용을 확인해요';
+}
+function colParse() {
+  const txt = ($('colIn') || {}).value || COL.text; COL.text = txt;
+  const toks = txt.match(/EV\d?\|\S+/g) || [], by = new Map(); COL.bad = []; let nTok = 0;
+  toks.forEach(t => { nTok++; const d = evDecodeCode(t); if (!d || d.err) { COL.bad.push({ t, err: d ? d.err : '읽을 수 없는 코드예요' }); return; } const k = d.name + '|' + d.klass, o = by.get(k); if (!o || d.atMs >= o.atMs) by.set(k, d); });
+  COL.recs = [...by.values()]; COL.ran = true; COL.sel = null;
+  if (!COL.touched && COL.recs.length) {      // 기준 칸은 코드에 가장 많이 담긴 설정으로 채운다
+    const cnt = new Map(); COL.recs.forEach(r => { const k = [r.level, r.ncA, r.ncB, r.leap2].join(); cnt.set(k, (cnt.get(k) || 0) + 1); });
+    const [l, a, b, p] = [...cnt.entries()].sort((x, y) => y[1] - x[1])[0][0].split(',').map(Number); COL.T = { level: l, ncA: a, ncB: b, leap2: p, wc: colWc(l) };
+  }
+  colCompute();
+}
+function colCompute() {
+  COL.recs.forEach(r => { r.g = colGrade(r, COL.T); });
+  const fq = new Map(); COL.recs.forEach(r => r.g.items.forEach(x => { if (!fq.has(x.key)) fq.set(x.key, { where: x.where, why: x.why, n: 0, bar: x.bar }); fq.get(x.key).n++; }));
+  COL.top = [...fq.values()].sort((a, b) => b.n - a.n || a.bar - b.bar).slice(0, 3);
+  const cat = new Map(); COL.recs.forEach(r => r.g.items.forEach(x => { const c = EVCAT.find(y => y[0].test(x.why)); if (c) cat.set(c[1], (cat.get(c[1]) || 0) + 1); }));
+  COL.cat = cat;
+}
+const colSorted = () => { const a = COL.recs.slice(); if (COL.sort === 'low') a.sort((x, y) => x.g.score - y.g.score || x.name.localeCompare(y.name, 'ko')); else if (COL.sort === 'high') a.sort((x, y) => y.g.score - x.g.score || x.name.localeCompare(y.name, 'ko')); else a.sort((x, y) => x.name.localeCompare(y.name, 'ko')); return a; };
+const colCls = s => (s >= 85 ? 'hi' : s >= 70 ? 'mi' : 'lo');
+function colStats() {
+  const R = COL.recs, n = R.length || 1, avg = k => Math.round(R.reduce((a, r) => a + r.g[k], 0) / n);
+  const sc = R.map(r => r.g.score);
+  return { n: R.length, avg: avg('score'), max: sc.length ? Math.max(...sc) : 0, min: sc.length ? Math.min(...sc) : 0, c: avg('c'), nn: avg('n'), away: R.filter(r => r.awayN >= 1).length, diff: R.filter(r => !r.g.same) };
+}
+function colClassName() { const m = new Map(); COL.recs.forEach(r => r.klass && m.set(r.klass, (m.get(r.klass) || 0) + 1)); const a = [...m.entries()].sort((x, y) => y[1] - x[1]); return a.length ? a[0][0] : ''; }
+/* ---- 보고서 HTML (화면·인쇄 공용) ---- */
+function colClassHtml() {
+  const st = colStats(), rows = colSorted();
+  const tr = rows.map(r => '<tr><td><b>' + esc(r.name) + '</b></td><td class="' + colCls(r.g.score) + '"><b>' + r.g.score + '</b></td><td>' + r.g.c + '%</td><td>' + r.g.n + '%</td><td>' + r.g.total + '</td><td>' + (r.awayN ? r.awayN + '회' : '0') + (r.g.same ? '' : ' ⚠') + '</td><td class="cm">' + esc(colShort(r.g)) + '</td></tr>').join('');
+  const bad = COL.bad.length ? '<p class="nt">읽을 수 없는 코드 ' + COL.bad.length + '개: ' + COL.bad.slice(0, 3).map(b => esc(b.t.slice(0, 18)) + '… (' + esc(b.err) + ')').join(' · ') + '</p>' : '';
+  return '<div class="pg cr"><div class="hd"><div><div class="sm">나도 작곡가 · 작곡 평가 학급 보고서</div><h1>' + esc(colClassName() || '학급 보고서') + '</h1></div><div class="sm r">' + esc(colRuleTxt(COL.T)) + '<br>제출 ' + st.n + '명 · 점수 비중 코드 ' + COL.T.wc + ' : 음 ' + (100 - COL.T.wc) + '</div></div>' +
+    '<div class="cards"><div><i>평균 점수</i><b>' + st.avg + '<small> 점</small></b></div><div><i>최고 / 최저</i><b>' + st.max + '<small> / ' + st.min + '</small></b></div><div><i>코드 · 음 평균</i><b>' + st.c + '<small> · ' + st.nn + '%</small></b></div><div><i>화면 이탈 1회 이상</i><b>' + st.away + '<small> 명</small></b></div></div>' +
+    (COL.top.length ? '<div class="top"><b>많이 틀린 곳</b> &nbsp; ' + COL.top.map(t => esc(t.where) + ' ' + t.n + '명').join(' · ') + '</div>' : '') +
+    '<table class="ct"><thead><tr><th>이름</th><th>총점</th><th>코드</th><th>음</th><th>틀림</th><th>이탈</th><th>총평</th></tr></thead><tbody>' + tr + '</tbody></table>' + bad +
+    '<div class="ft">' + (st.diff.length ? '⚠ 평가 설정이 이 기준과 다른 학생 (' + esc(st.diff.map(r => r.name).join('·')) + ') · 이 기준으로 채점했어요 · ' : '') + '이탈 = 평가 중 화면을 벗어난 횟수</div></div>';
+}
+function colStuHtml(r, showScore) {
+  const g = r.g, show = g.items.slice(0, 12), more = g.items.length - show.length;
+  const cats = [...new Set(g.items.map(x => (EVCAT.find(y => y[0].test(x.why)) || [])[2]).filter(Boolean))].slice(0, 3);
+  const bars = showScore ? '<div class="sc2"><div class="big ' + colCls(g.score) + '"><i>총점</i><b>' + g.score + '<small> / 100</small></b></div><div class="bs"><div>코드 진행 ' + g.c + '%<p><u style="width:' + g.c + '%"></u></p></div><div>음 선택 ' + g.n + '%<p><u style="width:' + g.n + '%"></u></p></div></div></div>' : '';
+  return '<div class="pg sr"><div class="hd"><div><div class="sm">나도 작곡가 · 작곡 평가 피드백</div><h1>' + esc(r.name) + (r.klass ? ' <small>' + esc(r.klass) + '</small>' : '') + '</h1></div><div class="sm r">레벨 ' + r.level + ' · ' + r.bars + '마디<br>' + colFmt(r.atMs) + '</div></div>' + bars +
+    '<div class="cm2"><b>총평</b> &nbsp; ' + esc(g.comment) + '</div>' +
+    (g.items.length ? '<h3>고쳐야 할 곳 <small>' + g.items.length + '개 · 잘한 곳은 적지 않았어요</small></h3>' + show.map(x => '<div class="it"><span class="w">' + x.bar + '마디</span><span><b>' + (x.k ? x.k + '번째 음 · ' : '코드 ') + esc(x.what) + '</b><br><span class="y">' + esc(x.why) + '</span></span></div>').join('') + (more > 0 ? '<div class="it y"><span class="w">…외 ' + more + '개</span><span>선생님과 함께 확인해요</span></div>' : '') : '<h3>규칙에 어긋난 곳이 없어요 👏</h3>') +
+    (cats.length ? '<div class="todo"><b>다시 해 볼 일</b> &nbsp; ' + cats.map(c => '□ ' + esc(c.replace(/\(.*?\)/g, '').trim())).join(' &nbsp; ') + '</div>' : '') + '</div>';
+}
+function colSongHtml(r) {
+  const g = r.g, bad = new Set(g.items.filter(x => x.k).map(x => x.bar + '-' + x.k));
+  return '<div class="song"><p class="sm">코드 ' + r.chords.join(' – ') + '</p><div class="sg">' + r.mel.map((m, b) => '<div><i>' + (b + 1) + '마디 · ' + r.chords[b] + '</i>' + m.notes.map((p, k) => '<span' + (bad.has((b + 1) + '-' + (k + 1)) ? ' class="x"' : '') + '>' + esc(evNote(p)) + '</span>').join(' ') + '</div>').join('') + '</div></div>';
+}
+const COL_CSS = `
+#col{max-width:1100px;margin:0 auto;padding:24px 16px 60px;font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;color:#23211d;font-size:15px}
+#col h1{margin:0;font-size:28px;letter-spacing:-.02em}#col h2{margin:0;font-size:18px}
+#col section.c{background:#fff;border:1px solid #ddd6c8;border-radius:12px;padding:18px;margin-top:16px}
+#col .top2{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between}
+#col .sm{font-size:12px;color:#6b665c}#col .r{text-align:right}
+#col .step{display:flex;gap:10px;align-items:center;margin-bottom:10px}#col .step span{width:26px;height:26px;border-radius:50%;background:#23211d;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+#col .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+#col .grid>div{border:1px solid #ddd6c8;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+#col .grid i{font-style:normal;font-size:12px;color:#6b665c}
+#col select,#col textarea,#col .btn2{font:inherit;border:1px solid #ccc4b3;border-radius:8px;padding:7px 10px;background:#faf8f3;color:inherit}
+#col textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;resize:vertical}
+#col .btn2{cursor:pointer;background:#fff}#col .btn2.pri{background:#23211d;color:#fff;border-color:#23211d;font-weight:700;padding:10px 20px}
+#col .ok{color:#1f6b45;font-size:13px}#col .warn{color:#b23a2e;font-size:13px}
+#col .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+#col .cards>div{border:1px solid #ddd6c8;border-radius:8px;padding:10px 12px;background:#fff}#col .cards i{display:block;font-style:normal;font-size:11px;color:#5b574e}#col .cards b{font-size:24px;font-weight:800}#col small{font-size:12px;font-weight:400;color:#5b574e}
+#col table.ct{width:100%;border-collapse:collapse;font-size:13px}#col .ct th{background:#f1eee7;text-align:left;padding:6px 8px;font-size:11.5px;color:#5b574e}#col .ct td{padding:6px 8px;border-top:1px solid #e3dfd6}
+#col .ct .cm{color:#5b574e;font-size:12px}#col .hi{color:#1f6b45}#col .mi{color:#9a6a00}#col .lo{color:#b23a2e}
+#col .ct tbody tr.pick td{background:#eef3ff}#col a.nm{color:#1d4ed8;text-decoration:underline;cursor:pointer;font-weight:700}
+#col .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #23211d;padding-bottom:10px}#col .hd small{font-size:14px}
+#col .top{font-size:13px;background:#faf8f3;border-radius:8px;padding:8px 12px;margin-bottom:12px}#col .ft,#col .nt{font-size:11px;color:#8a8478;margin-top:8px}
+#col .sc2{display:grid;grid-template-columns:200px 1fr;gap:24px;align-items:center;margin:16px 0}#col .big{border:1px solid #ddd6c8;border-radius:10px;padding:12px;text-align:center}#col .big i{display:block;font-style:normal;font-size:11px;color:#5b574e}#col .big b{font-size:46px;font-weight:800;line-height:1.1}
+#col .bs{display:flex;flex-direction:column;gap:9px;font-size:12px;color:#5b574e}#col .bs p{margin:3px 0 0;height:9px;background:#ece7db;border-radius:5px}#col .bs u{display:block;height:9px;background:#9a6a00;border-radius:5px}
+#col .cm2{background:#faf8f3;border-radius:10px;padding:12px 16px;line-height:1.7;margin:14px 0}#col h3{margin:16px 0 4px;font-size:15px}#col h3 small{font-weight:400}
+#col .it{display:grid;grid-template-columns:70px 1fr;gap:10px;padding:8px 0;border-top:1px solid #e3dfd6;font-size:13px;line-height:1.55}#col .y{color:#5b574e}
+#col .todo{margin-top:16px;border:1px dashed #ccc4b3;border-radius:10px;padding:10px 14px;font-size:12px;color:#5b574e;line-height:1.7}
+#col .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;font-size:13px}#col .sg>div{border:1px solid #ddd6c8;border-radius:8px;padding:6px 8px}#col .sg i{display:block;font-style:normal;font-size:11px;color:#6b665c}#col .x{color:#b23a2e;font-weight:800;text-decoration:underline}
+#col .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#col .sw{display:inline-flex;gap:8px;align-items:center;cursor:pointer;font-size:14px}
+#col .paper{background:#fff;border:1px solid #ddd6c8;border-radius:8px;padding:28px 32px;margin-top:10px;max-width:794px}
+#colPrint{display:none}
+@media print{@page{size:A4;margin:12mm}#col{display:none!important}#colPrint{display:block!important;font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;color:#23211d}
+#colPrint .pg{page-break-after:always;padding:0}#colPrint .pg:last-child{page-break-after:auto}#colPrint tr{page-break-inside:avoid}#colPrint thead{display:table-header-group}
+#colPrint h1{margin:0;font-size:24px}#colPrint .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #23211d;padding-bottom:8px}#colPrint .sm{font-size:11px;color:#5b574e}#colPrint .r{text-align:right}
+#colPrint .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}#colPrint .cards>div{border:1px solid #bbb;border-radius:6px;padding:8px 10px}#colPrint .cards i{display:block;font-style:normal;font-size:10px}#colPrint .cards b{font-size:20px}
+#colPrint .top{font-size:12px;background:#f3f1ea;padding:7px 10px;margin-bottom:10px}#colPrint table{width:100%;border-collapse:collapse;font-size:12px}#colPrint th{background:#eee;text-align:left;padding:5px 6px;font-size:11px}#colPrint td{padding:4px 6px;border-top:1px solid #ddd}#colPrint .cm{font-size:11px;color:#444}
+#colPrint .hi{color:#1f6b45}#colPrint .mi{color:#9a6a00}#colPrint .lo{color:#b23a2e}#colPrint .ft{font-size:10px;color:#777;margin-top:8px}
+#colPrint .sc2{display:grid;grid-template-columns:180px 1fr;gap:20px;align-items:center;margin:14px 0}#colPrint .big{border:1px solid #bbb;border-radius:8px;padding:10px;text-align:center}#colPrint .big b{font-size:42px}#colPrint .big i{display:block;font-style:normal;font-size:11px}
+#colPrint .bs p{margin:3px 0 0;height:8px;background:#e5e5e5;border-radius:4px}#colPrint .bs u{display:block;height:8px;background:#777;border-radius:4px}#colPrint .bs{font-size:11px;display:flex;flex-direction:column;gap:8px}
+#colPrint .cm2{background:#f3f1ea;border-radius:8px;padding:10px 14px;line-height:1.7;margin:12px 0;font-size:14px}#colPrint h3{margin:14px 0 4px;font-size:15px}#colPrint h3 small{font-weight:400;font-size:11px}
+#colPrint .it{display:grid;grid-template-columns:60px 1fr;gap:8px;padding:7px 0;border-top:1px solid #ddd;font-size:13px;line-height:1.5}#colPrint .y{color:#555}#colPrint .todo{margin-top:14px;border:1px dashed #999;padding:9px 12px;font-size:12px;line-height:1.7}
+}`;
+function colRender() {
+  const T = COL.T, st = colStats(), sel = COL.recs.find(r => r.name + '|' + r.klass === COL.sel), lv = T.level;
+  const opt = (arr, cur, lab) => arr.map(v => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + lab(v) + '</option>').join('');
+  let h = '<div class="top2"><div><div class="sm">나도 작곡가 · 교사용</div><h1>교사용 평가 분석툴</h1></div><div class="sm" style="background:#fff;border:1px solid #ddd6c8;border-radius:8px;padding:8px 12px">학생 데이터는 이 브라우저 밖으로 나가지 않아요 · 서버 없음</div></div>';
+  h += '<section class="c"><div class="step"><span>1</span><h2>채점 기준 정하기</h2><span class="sm" style="background:none;color:#6b665c;width:auto;height:auto;font-weight:400">학생에게 낸 평가와 같은 기준으로 맞춰 주세요. 바꾸면 바로 다시 계산돼요.</span></div><div class="grid">' +
+    '<div><i>레벨</i><select data-c="level">' + opt([2, 3, 4], lv, v => '레벨 ' + v + (v === 2 ? ' · 코드 음만' : v === 3 ? ' · 비화성음 허용' : ' · 도약 제한 추가')) + '</select></div>' +
+    (lv >= 3 ? '<div><i>비화성음 최대 횟수 (곡 전체)</i>2번째 음 <select data-c="ncA">' + opt(NC_CAPS, T.ncA, ncCapTxt) + '</select>4번째 음 <select data-c="ncB">' + opt(NC_CAPS, T.ncB, ncCapTxt) + '</select></div>' : '') +
+    (lv === 4 ? '<div><i>도약 한도</i><select data-c="leap2">' + opt([2, 3, 4, 5, 6], T.leap2, v => '앞뒤 음과 ' + (v + 2) + '도 이상 금지') + '</select></div>' : '') +
+    '<div><i>점수 비중</i>코드 진행 <select data-c="wc">' + opt([20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80], T.wc, v => v + '%') + '</select><span>음 선택 ' + (100 - T.wc) + '%</span></div></div>' +
+    (COL.recs.length ? (st.diff.length ? '<p class="warn">⚠ 이 기준과 다른 설정으로 평가를 시작한 학생 ' + st.diff.length + '명: ' + esc(st.diff.map(r => r.name + '(' + colRuleTxt({ level: r.level, ncA: r.ncA, ncB: r.ncB, leap2: r.leap2 }).replace(/ · 비화성음 /, ' ') + ')').join(', ')) + ' — 위 기준으로 채점했어요.</p>' : '<p class="ok">✓ 모든 학생이 이 기준과 같은 설정으로 평가했어요.</p>') : '') + '</section>';
+  h += '<section class="c"><div class="step"><span>2</span><h2>제출 코드 붙여 넣기</h2></div><p class="sm" style="margin:0 0 8px;line-height:1.6">구글폼 응답 시트에서 <b>코드 열을 통째로 복사</b>해 붙여 넣으세요. 이름이 같은 코드가 여러 개면 가장 마지막 제출만 써요.</p><textarea id="colIn" rows="5" placeholder="EV2|홍길동|3-2|3|8|…">' + esc(COL.text) + '</textarea><div class="tools" style="margin-top:10px"><button class="btn2 pri" type="button" data-a="run">보고서 만들기</button>' +
+    (COL.ran ? '<span class="' + (COL.bad.length ? 'warn' : 'ok') + '">' + (COL.recs.length ? '✓ ' + COL.recs.length + '명 읽음' : '읽은 코드가 없어요') + (COL.bad.length ? ' · 읽을 수 없는 코드 ' + COL.bad.length + '개' : '') + '</span>' : '') + '</div>' +
+    (COL.bad.length ? '<p class="warn" style="margin:8px 0 0">' + COL.bad.map(b => esc(b.t.slice(0, 22)) + '… : ' + esc(b.err)).join('<br>') + '</p>' : '') + '</section>';
+  if (COL.recs.length) {
+    h += '<section class="c"><div class="step"><span>3</span><h2>반 전체 보고서</h2></div><div class="tools" style="margin-bottom:10px"><select data-a="sort"><option value="name"' + (COL.sort === 'name' ? ' selected' : '') + '>이름순</option><option value="low"' + (COL.sort === 'low' ? ' selected' : '') + '>점수 낮은 순</option><option value="high"' + (COL.sort === 'high' ? ' selected' : '') + '>점수 높은 순</option></select>' +
+      '<button class="btn2" type="button" data-a="xls">엑셀로 저장</button><button class="btn2" type="button" data-a="pclass">학급 보고서 인쇄 / PDF</button><button class="btn2" type="button" data-a="pall">학생 보고서 한꺼번에 (' + COL.recs.length + '장)</button></div>' +
+      '<div class="paper" style="max-width:none;padding:18px 22px">' + colClassHtml().replace('<div class="pg cr">', '<div class="cr">') + '</div><p class="sm" style="margin:8px 0 0">학생 이름을 누르면 아래에 그 학생의 보고서가 열려요.</p></section>';
+    h += '<section class="c" id="colStu"><div class="step"><span>4</span><h2>학생 보고서' + (sel ? ' · ' + esc(sel.name) : '') + '</h2></div>';
+    if (!sel) h += '<p class="sm">위 표에서 이름을 눌러 주세요.</p>';
+    else h += '<div class="tools"><label class="sw"><input type="checkbox" data-a="score"' + (COL.score ? ' checked' : '') + '> 점수 보이기</label><button class="btn2" type="button" data-a="pone">이 학생 인쇄 / PDF</button></div><div class="paper">' + colStuHtml(sel, COL.score).replace('<div class="pg sr">', '<div class="sr">') + '</div><details style="margin-top:10px"><summary>곡 전체 보기</summary>' + colSongHtml(sel) + '</details>';
+    h += '</section>';
+  }
+  $('col').innerHTML = h;
+  const nm = document.querySelectorAll('#col .ct tbody tr');
+  nm.forEach((tr, i) => { const r = colSorted()[i]; if (!r) return; const td = tr.firstElementChild; td.innerHTML = '<a class="nm" data-n="' + esc(r.name + '|' + r.klass) + '">' + esc(r.name) + ' ▸</a>'; if (COL.sel === r.name + '|' + r.klass) tr.classList.add('pick'); });
+}
+function colPrint(html) { $('colPrint').innerHTML = html; setTimeout(() => window.print(), 60); }
+function colXls() {
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', head = ['이름', '반', '총점', '코드진행%', '음선택%', '틀린개수', '이탈횟수', '이탈시간', '총평', '평가설정', '기준일치', '제출시각'];
+  const rows = colSorted().map(r => [r.name, r.klass, r.g.score, r.g.c, r.g.n, r.g.total, r.awayN, evDur(r.awayMs), r.g.comment, colRuleTxt({ level: r.level, ncA: r.ncA, ncB: r.ncB, leap2: r.leap2 }), r.g.same ? 'O' : 'X', colFmt(r.atMs)].map(q).join(','));
+  const blob = new Blob(['﻿' + [head.map(q).join(',')].concat(rows).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '작곡평가_' + (colClassName() || '학급').replace(/[^\w가-힣-]+/g, '_') + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function COLLECT_BOOT() {
+  document.title = '교사용 평가 분석툴';
+  [...document.body.children].forEach(el => { if (!/^(SCRIPT|STYLE)$/.test(el.tagName)) el.style.display = 'none'; });
+  const st = document.createElement('style'); st.textContent = COL_CSS; document.head.appendChild(st);
+  document.body.style.background = '#f4f1ea'; document.body.dataset.eval = '1';
+  const col = document.createElement('div'); col.id = 'col'; const pr = document.createElement('div'); pr.id = 'colPrint'; document.body.append(col, pr);
+  colRender();
+  col.addEventListener('click', e => {
+    const n = e.target.closest('[data-n]'); if (n) { COL.sel = n.dataset.n; colRender(); const el = $('colStu'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const a = e.target.closest('button[data-a]'); if (!a) return; COL.text = ($('colIn') || {}).value || COL.text;
+    const k = a.dataset.a;
+    if (k === 'run') { colParse(); colRender(); }
+    else if (k === 'xls') colXls();
+    else if (k === 'pclass') colPrint(colClassHtml());
+    else if (k === 'pall') colPrint(colSorted().map(r => colStuHtml(r, COL.score)).join(''));
+    else if (k === 'pone') { const r = COL.recs.find(x => x.name + '|' + x.klass === COL.sel); if (r) colPrint(colStuHtml(r, COL.score)); }
+  });
+  col.addEventListener('change', e => {
+    const t = e.target; COL.text = ($('colIn') || {}).value || COL.text;
+    if (t.dataset.c) { const k = t.dataset.c; COL.T[k] = +t.value; COL.touched = true; if (k === 'level') COL.T.wc = colWc(COL.T.level); colCompute(); colRender(); }
+    else if (t.dataset.a === 'sort') { COL.sort = t.value; colRender(); }
+    else if (t.dataset.a === 'score') { COL.score = t.checked; colRender(); }
+  });
+}
+/* ==== /COLLECTOR ==== */
 function EVAL_BOOT() {
   try { const q = new URLSearchParams(location.search).get('f'); if (q) EV.form = formDec(q); } catch (e) {}
   document.body.dataset.eval = '1'; S.evalOpen = true; S.showHint = false;
@@ -5000,12 +5176,10 @@ function EVAL_BOOT() {
   $('evalStart').addEventListener('click', e => {
     const a = e.target.closest('[data-evf]'); if (!a) return;
     if (a.dataset.evf === 'copy') { const t = $('evFormUrl'); if (t) { t.select(); try { navigator.clipboard.writeText(t.value); flash('학생용 주소를 복사했어요'); } catch (_) { document.execCommand('copy'); } } return; }
-    const out = $('evFormOut'), f = formParse(($('evFormLink') || {}).value || ''); EV.formLink = ($('evFormLink') || {}).value || ''; EV.formOpen = true;
-    if (!f) { EV.formOut = '<p class="evp evwarn">구글폼의 「링크 받기」로 만든 주소가 아니에요. 주소가 https://docs.google.com/forms/d/e/…/viewform?…entry.123=… 모양인지 확인해 주세요.</p>'; out.innerHTML = EV.formOut; return; }
-    const keys = Object.values(f.map), miss = !keys.includes('name') ? '이름 문항이 연결되지 않았어요. 이름 칸에 「이름」이라고 미리 적어 주세요.' : !keys.length ? '연결된 문항이 없어요.' : '';
-    const url = location.origin + location.pathname + '?f=' + formEnc(f);
-    EV.formOut = '<p class="evp">연결된 문항 ' + keys.length + '개: ' + Object.entries(f.map).map(([n, k]) => FORM_KO[k] + ' ← entry.' + n).join(' · ') + (f.unk.length ? '<br>인식하지 못한 낱말(무시돼요): ' + f.unk.map(x => '「' + x.replace(/</g, '&lt;') + '」').join(' ') : '') + '</p>' + (miss ? '<p class="evp evwarn">' + miss + '</p>' : '') +
-      (keys.length ? '<label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button>' : '');
+    const out = $('evFormOut'), raw = ($('evFormLink') || {}).value || '', f = formParse(raw); EV.formLink = raw; EV.formOpen = true;
+    if (!f) { EV.formOut = '<p class="evp evwarn">' + (/\/forms\/d\/(?!e\/)/.test(raw) ? '이 주소는 폼을 고치는 주소예요. 폼 우측 상단의 「보내기」 → 링크 아이콘에서 복사한 주소를 붙여 넣어 주세요.' : '구글폼 주소가 아니에요. 「보내기」 → 링크 아이콘에서 복사한 주소(https://forms.gle/… 또는 …/viewform)를 붙여 넣어 주세요.') + '</p>'; out.innerHTML = EV.formOut; return; }
+    const url = location.href.split('#')[0].split('?')[0] + '?f=' + formEnc(f), filled = Object.values(f.map).includes('code');
+    EV.formOut = '<p class="evp">✓ 연결됐어요 · ' + (filled ? '학생이 폼을 열면 제출 코드가 미리 채워져요' : '학생이 폼에 제출 코드를 붙여 넣어요') + '</p><label class="evl">학생용 주소<input id="evFormUrl" type="text" readonly value="' + url.replace(/"/g, '&quot;') + '"></label><button class="btn sm" type="button" data-evf="copy">📋 주소 복사</button>';
     out.innerHTML = EV.formOut;
   });
   $('evalStart').addEventListener('input', e => { if (e.target.id === 'evFormLink') EV.formLink = e.target.value; if (e.target.id === 'evClass') EV.klass = e.target.value;
@@ -5042,7 +5216,7 @@ function showEvalStart() {
   const el = $('evalStart'); el.hidden = false;
   if (EV.mode === 'teacher') { renderTeacher(el); return; }
   const c = EV.cfg;
-  el.innerHTML = '<h2>작곡 평가</h2>' + (EV.web && !EV.form ? '<p class="evp evwarn"><b>이 주소로는 선생님께 자동 제출이 되지 않아요.</b> 선생님이 알려준 주소로 다시 들어오면 제출이 돼요. 이대로 풀면 끝난 뒤 결과를 복사해서 직접 보내야 해요.</p>' : '') + '<p class="evp">이름을 적고, 평가할 레벨을 골라요. 평가가 시작되면 모든 건반과 코드가 열려 있고, 다른 화면(탭·앱)으로 나갔다 오면 횟수와 시간이 선생님께 보고돼요.  끝날 때까지 경고나 안내가 나오지 않아요. 규칙은 화면에 계속 보여요. 모두 완성하면 「교사에게 제출」 버튼이 나타나요.</p>' +
+  el.innerHTML = '<h2>작곡 평가</h2>' + '<p class="evp">이름을 적고, 평가할 레벨을 골라요. 평가가 시작되면 모든 건반과 코드가 열려 있고, 다른 화면(탭·앱)으로 나갔다 오면 횟수와 시간이 선생님께 보고돼요.  끝날 때까지 경고나 안내가 나오지 않아요. 규칙은 화면에 계속 보여요. 모두 완성하면 「제출」 버튼이 나타나요.</p>' +
     '<label class="evl">이름 (학번 포함)<input id="evName" type="text" maxlength="30" placeholder="예) 3학년 2반 5번 홍길동" value="' + EV.name.replace(/"/g, '&quot;') + '"></label>' +
     '<label class="evl">반 (선생님이 알려준 것, 없으면 비워도 돼요)<input id="evClass" type="text" maxlength="30" placeholder="예) 3-2" value="' + EV.klass.replace(/"/g, '&quot;') + '"></label>' +
     '<div class="evl">평가 레벨</div><div class="evlv">' + [2, 3, 4].map(l => '<button type="button" class="evcard" data-ev="lv" data-v="' + l + '" aria-pressed="' + (c.lv === l) + '"><b>' + EVLV[l][0] + '</b><span>' + EVLV[l][1] + '</span></button>').join('') + '</div>' +
@@ -5064,6 +5238,7 @@ function evalAct(a, el) {
   else if (a === 'submit') evalSubmit();
   else if (a === 'csv') evCsvSave();
   else if (a === 'copy') evalCopy();
+  else if (a === 'openform') { const u = evFormOpenUrl(); if (u) window.open(u, '_blank', 'noopener'); }
   else if (a === 'save') evalDownload();
   else if (a === 'again') { S.started = false; S.submitted = null; EV.mode = 'start'; try { localStorage.removeItem(EVKEY); } catch (e) {} renderAll(); }
 }
@@ -5142,7 +5317,41 @@ function evalReport() {
     L.push('');
   } else L.push('■ 규칙에 어긋난 곳이 없어요', '');
   L.push('■ 학생이 만든 곡', '코드 진행: ' + S.chords.join(' – '), ...mel);
-  return { name: S.name, klass: S.klass || '', comment, level: S.level, bars: N, rule, at, atMs: d.getTime(), awayN: (S.away && S.away.n) || 0, awayMs: (S.away && S.away.ms) || 0, score, accChord: Math.round(acc.c * 100), accNote: Math.round(acc.n * 100), accRhythm: Math.round(acc.r * 100), total: r.total, nChords: r.chords.length, nNotes: r.notes.length, nRhythm: 0, noRh: true, progression: S.chords.join(' '), text: L.join('\n') };
+  return { name: S.name, klass: S.klass || '', comment, level: S.level, bars: N, rule, at, atMs: d.getTime(), awayN: (S.away && S.away.n) || 0, awayMs: (S.away && S.away.ms) || 0, score, accChord: Math.round(acc.c * 100), accNote: Math.round(acc.n * 100), accRhythm: Math.round(acc.r * 100), total: r.total, nChords: r.chords.length, nNotes: r.notes.length, nRhythm: 0, noRh: true, progression: S.chords.join(' '), code: evEncode({ name: S.name, klass: S.klass, level: S.level, bars: S.bars, ncA: S.ncA, ncB: S.ncB, leap2: S.leap2, away: S.away, atMs: d.getTime(), chords: S.chords, mel: S.mel }), text: L.join('\n') };
+}
+/* ---------- 제출 코드 (EV2) ----------
+   학생에게는 점수·결과를 보여 주지 않고, 선생님의 평가 분석툴(collector.html, 평가 분석툴)이 읽어서 채점한다.
+   형식: EV2|이름|반|레벨|마디|2번째음횟수|4번째음횟수|도약|이탈횟수|이탈초|제출시각|코드진행|음표|검산
+   음표: 한 음표 = 알파벳 2글자 (음높이 A~X = 다장조 C3~E6 24음 · 길이 A=8분 B=4분 C=점4분 D=2분 E=온음표), 마디는 '-'로 구분 */
+const EV_PITCH = (() => { const a = []; for (let p = 48; p <= 88; p++) if ([0, 2, 4, 5, 7, 9, 11].includes(p % 12)) a.push(p); return a; })();
+const EV_DUR = [1, 2, 3, 4, 8], EV_AL = i => String.fromCharCode(65 + i);
+const evCk = t => { let n = 0; for (let i = 0; i < t.length; i++) n = (n * 31 + t.charCodeAt(i)) % 676; return EV_AL(Math.floor(n / 26)) + EV_AL(n % 26); };
+function evEncode(st) {
+  try {
+    const clean = v => String(v || '').replace(/[\s|]+/g, '_').slice(0, 30);
+    const music = st.mel.map((m, b) => { const pt = m.pat === 'F' ? FINAL_PATTERN : PATTERNS[m.pat]; return m.notes.map((p, k) => { const a = EV_PITCH.indexOf(p), d = EV_DUR.indexOf(pt.d[k]); if (a < 0 || d < 0) throw 0; return EV_AL(a) + EV_AL(d); }).join(''); }).join('-');
+    const chords = st.chords.map(c => { const i = PLAN_ALL.indexOf(c); if (i < 0) throw 0; return EV_AL(i); }).join('');
+    const body = ['EV2', clean(st.name), clean(st.klass), st.level, st.bars, st.ncA, st.ncB, st.leap2, (st.away && st.away.n) || 0, Math.round(((st.away && st.away.ms) || 0) / 1000), (st.atMs || Date.now()).toString(36), chords, music].join('|');
+    return body + '|' + evCk(body);
+  } catch (e) { return ''; }
+}
+function evDecodeCode(raw) {          // 코드 한 개 → 학생 기록 (읽을 수 없으면 null)
+  try {
+    const t = String(raw).trim(), i = t.lastIndexOf('|'); if (i < 0) return null;
+    const body = t.slice(0, i); if (evCk(body) !== t.slice(i + 1)) return { err: '코드가 일부 잘렸거나 글자가 바뀐 것 같아요' };
+    const f = body.split('|'); if (f.length !== 13 || f[0] !== 'EV2') return null;
+    const level = +f[3], bars = +f[4], ncA = +f[5], ncB = +f[6], leap2 = +f[7];
+    if (![2, 3, 4].includes(level) || ![8, 16, 32].includes(bars) || !NC_CAPS.includes(ncA) || !NC_CAPS.includes(ncB) || ![2, 3, 4, 5, 6].includes(leap2)) return { err: '지원하지 않는 설정이에요' };
+    const chords = f[11].split('').map(ch => PLAN_ALL[ch.charCodeAt(0) - 65]); if (chords.length !== bars || chords.some(c => !c)) return { err: '코드 진행을 읽을 수 없어요' };
+    const bs = f[12].split('-'); if (bs.length !== bars) return { err: '마디 수가 맞지 않아요' };
+    const mel = bs.map((x, b) => {
+      if (x.length % 2) throw 0; const notes = [], d = [];
+      for (let k = 0; k < x.length; k += 2) { const a = x.charCodeAt(k) - 65, e = x.charCodeAt(k + 1) - 65; if (!(a >= 0 && a < EV_PITCH.length && e >= 0 && e < EV_DUR.length)) throw 0; notes.push(EV_PITCH[a]); d.push(EV_DUR[e]); }
+      const pat = d.length === 1 && d[0] === 8 ? 'F' : PATTERNS.findIndex(p => p.d.join() === d.join()); if (pat === -1) throw 0;
+      return { pat, notes };
+    });
+    return { name: f[1].replace(/_/g, ' '), klass: f[2].replace(/_/g, ' '), level, bars, ncA, ncB, leap2, awayN: +f[8] || 0, awayMs: (+f[9] || 0) * 1000, atMs: parseInt(f[10], 36) || 0, chords, mel };
+  } catch (e) { return { err: '음표를 읽을 수 없어요' }; }
 }
 async function evalSubmit() {
   if (EV.busy || !(S.phase === 'write' && melDone(S))) return;
@@ -5150,36 +5359,41 @@ async function evalSubmit() {
   const rep = evalReport(); let sent = false;
   try {
     if (EV.db && EV.uid) { await EV.db.doc('submissions/' + EV.uid).set(rep); sent = true; }
-    else if (EV.form) { await webSendForm(rep); sent = true; }
   } catch (e) { sent = false; }
-  S.submitted = { text: rep.text, sent, at: rep.at, name: rep.name, form: !!EV.form }; EV.busy = false; save(); renderAll();
+  S.submitted = { text: rep.code, sent, at: rep.at, name: rep.name, form: !!EV.form }; EV.busy = false; save(); renderAll();
 }
+function evFormOpenUrl() {         // 선생님 구글폼 주소 (제출 코드 칸이 미리 작성돼 있으면 코드를 채워서)
+  const f = EV.form, t = S.submitted && S.submitted.text; if (!f) return '';
+  if (f.u) return f.u;
+  const v = { code: t, name: S.name, klass: S.klass || '' }, q = [];
+  Object.entries(f.map).forEach(([no, key]) => { if (v[key]) q.push('entry.' + no + '=' + encodeURIComponent(v[key])); });
+  return 'https://docs.google.com/forms/d/e/' + f.id + '/viewform' + (q.length ? '?usp=pp_url&' + q.join('&') : '');
+}
+const evFormFilled = () => !!(EV.form && !EV.form.u && Object.values(EV.form.map).includes('code'));
 async function evalCopy() {
   const t = S.submitted && S.submitted.text; if (!t) return;
   let ok = false; try { await navigator.clipboard.writeText(t); ok = true; } catch (e) {}
   if (!ok) { const ta = $('evText'); if (ta) { const d = ta.closest('details'); if (d) d.open = true; ta.focus(); ta.select(); try { ok = document.execCommand('copy'); } catch (e) {} } }
-  const m = $('evMsg'); if (m) m.textContent = ok ? '복사했어요. 선생님께 붙여 넣어 보내 주세요.' : '아래 글을 길게 눌러 직접 복사해 주세요.';
+  const m = $('evMsg'); if (m) m.textContent = ok ? (EV.form ? '복사했어요. 「선생님 폼 열기」를 눌러 제출 코드 칸에 붙여 넣어요.' : '복사했어요. 선생님께 붙여 넣어 보내 주세요.') + ' (내용은 선생님만 볼 수 있어요)' : '아래 코드를 길게 눌러 직접 복사해 주세요.';
 }
 async function evalDownload() {
-  const t = S.submitted && S.submitted.text; if (!t || !DL) { const m = $('evMsg'); if (m) m.textContent = '이 화면에서는 파일 저장이 안 돼요. 「결과 복사하기」를 써 주세요.'; return; }
+  const t = S.submitted && S.submitted.text; if (!t || !DL) { const m = $('evMsg'); if (m) m.textContent = '이 화면에서는 파일 저장이 안 돼요. 「제출 코드 복사하기」를 써 주세요.'; return; }
   try { await DL.save({ filename: '평가결과_' + (S.name || '학생').replace(/[^\w가-힣]+/g, '_') + '.txt', data: t }); } catch (e) {}
 }
 function renderEvalSubmit() {
   const el = $('levelup'), done = S.started && S.phase === 'write' && melDone(S);
   if (S.submitted) {
-    const s = S.submitted, mail = TEACHER_EMAIL ? '<a class="btn" href="mailto:' + TEACHER_EMAIL + '?subject=' + encodeURIComponent('[작곡 평가] ' + s.name) + '&body=' + encodeURIComponent(s.text) + '" target="_blank" rel="noopener noreferrer">✉ 메일로 보내기</a>' : '';
+    const s = S.submitted, fu = evFormOpenUrl();
     el.hidden = false; el.className = 'levelup evdone';
-    const fb = '<div class="evbtns"><button class="btn pri" type="button" data-ev="copy">📋 결과 복사하기</button><button class="btn" type="button" data-ev="save">💾 파일로 저장</button>' + mail + '</div><p class="lbl" id="evMsg"></p><details><summary>결과 글 직접 복사하기</summary><textarea id="evText" readonly rows="8">' + s.text.replace(/</g, '&lt;') + '</textarea></details>';
-    if (s.sent && s.form) el.innerHTML = '<div><b>✓ 선생님께 제출했어요</b><p>수고했어요! 이제 창을 닫아도 돼요.</p><details><summary>선생님이 결과를 못 받았다고 하면</summary><p>아래 버튼으로 결과를 직접 보낼 수 있어요.</p>' + fb + '</details></div>';
-    else if (s.sent) el.innerHTML = '<div><b>✓ 선생님께 제출했어요</b><p>수고했어요! 이제 창을 닫아도 돼요.</p></div>';
-    else if (s.form) el.innerHTML = '<div><b>제출하지 못했어요</b><p>인터넷 연결을 확인하고 다시 눌러 주세요. 계속 안 되면 아래 버튼으로 결과를 선생님께 직접 보내 주세요.</p><div class="evbtns"><button class="btn pri" type="button" data-ev="submit">다시 제출하기</button></div>' + fb + '</div>';
-    else el.innerHTML = '<div><b>평가를 마쳤어요</b><p>' + (EV.web ? '선생님이 알려준 주소로 들어오지 않아서 바로 보낼 수 없어요. 아래 버튼으로 결과를 선생님께 전달해 주세요.' : '이 화면에서는 선생님께 바로 보낼 수 없어요. 아래 버튼으로 결과를 선생님께 전달해 주세요.') + '</p>' + fb + '</div>';
-    if (s.sent || !s.form) el.querySelector('div').insertAdjacentHTML('beforeend', '<p><button class="textbtn" type="button" data-ev="again">새 평가 시작하기 (다른 학생용)</button></p>');
+    if (s.sent) el.innerHTML = '<div><b>✓ 선생님께 제출했어요</b><p>수고했어요! 이제 창을 닫아도 돼요.</p></div>';
+    else el.innerHTML = '<div><b>✓ 평가를 마쳤어요</b><p>아래 <b>제출 코드</b>를 복사해서 선생님께 제출해요. 코드는 선생님만 읽을 수 있어요.</p><div class="evbtns"><button class="btn pri" type="button" data-ev="copy">📋 코드 복사</button>' +
+      (fu ? '<button class="btn" type="button" data-ev="openform">📝 ' + (evFormFilled() ? '코드가 채워진 폼 열기' : '선생님 폼 열기') + '</button>' : '') + '</div><p class="lbl" id="evMsg"></p><textarea id="evText" readonly rows="3">' + String(s.text).replace(/</g, '&lt;') + '</textarea></div>';
+    el.querySelector('div').insertAdjacentHTML('beforeend', '<p><button class="textbtn" type="button" data-ev="again">새 평가 시작하기 (다른 학생용)</button></p>');
     el._f = null; return;
   }
   if (!done) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false; el.className = 'levelup';
-  el.innerHTML = '<div><b>모두 완성했어요</b><p>다 만들었으면 제출해요. 제출하면 고칠 수 없어요.</p></div><button class="btn pri" type="button" data-ev="submit"' + (EV.busy ? ' disabled' : '') + '>' + (EV.busy ? '제출 중…' : '교사에게 제출') + '</button>';
+  el.innerHTML = '<div><b>모두 완성했어요</b><p>다 만들었으면 제출해요. 제출하면 고칠 수 없어요.</p></div><button class="btn pri" type="button" data-ev="submit"' + (EV.busy ? ' disabled' : '') + '>' + (EV.busy ? '만드는 중…' : ((EV.db && EV.uid) ? '교사에게 제출' : '제출 코드 만들기')) + '</button>';
 }
 /* ---------- 교사용 목록 ---------- */
 async function loadTeacher() {
