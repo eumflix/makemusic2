@@ -4962,6 +4962,7 @@ function evFormSetup() {
   if (EV.form) return '<p class="evp">✓ 구글폼으로 제출되도록 연결돼 있어요.</p>';
   if (!EV.web) return '';
   return '<details class="evteach"' + (EV.formOpen ? ' open' : '') + '><summary>선생님 · 구글폼으로 결과 받기</summary>' +
+    '<p class="evp"><b>⚡ 가장 쉬운 방법</b>: <a href="teacher.html" target="_blank" rel="noopener">구글폼 자동 만들기</a> — 코드를 한 번 붙여 넣고 실행하면 폼과 학생용 주소가 만들어져요.</p><p class="evp">이미 만든 폼이 있다면 아래 방법으로 연결해요.</p>'+
     '<ol class="evp"><li>구글폼에 문항을 만들고(단답형·장문형), 우측 상단 ⋮ → 「양식 미리 작성」에서 문항마다 약속된 낱말을 적어요: <b>이름 · 반 · 레벨 · 마디 · 총점 · 코드 · 음 · 리듬 · 이탈 · 총평 · 결과 · 시각</b> 중 받고 싶은 것 (결과 = 곡과 틀린 곳 전문)</li><li>「링크 받기」로 만든 주소를 아래에 붙여 넣어요.</li><li>만들어진 <b>학생용 주소</b>를 학생들에게 나눠 줘요. 폼 설정에서 로그인 요구·응답 1회 제한은 꺼 두세요.</li></ol>' +
     '<textarea id="evFormLink" rows="3" placeholder="미리 작성된 구글폼 링크를 붙여 넣어요">' + (EV.formLink || '').replace(/</g, '&lt;') + '</textarea><div><button class="btn sm" type="button" data-evf="make">학생용 주소 만들기</button></div><div id="evFormOut">' + (EV.formOut || '') + '</div></details>';
 }
@@ -4992,6 +4993,7 @@ function EVAL_BOOT() {
     S.submitted = j.submitted || null; S.startedAt = j.startedAt || null; S.klass = String(j.klass || '').slice(0, 30); EV.klass = S.klass; S.away = j.away && j.away.n >= 0 ? { n: +j.away.n || 0, ms: +j.away.ms || 0 } : { n: 0, ms: 0 }; S.started = true; S.hist = []; S.lastPut = null; S.planSel = 0; fixPlanSel(); resetSel();
     if (j.selBar != null && S.phase === 'write') { S.selBar = clamp(+j.selBar || 0, 0, S.bars - 1); fixSel(); }
   } else S.started = false;
+  try { if (new URLSearchParams(location.search).has('setup')) { S.started = false; EV.formOpen = true; } } catch (e) {}      // eval.html?setup=1 : 진행 중인 평가가 있어도 선생님 설정 화면을 바로 열어요
   setBodyMode(); renderAll(); evalWatchAway();
   $('levelup').addEventListener('click', e => { const a = e.target.closest('[data-ev]'); if (a) evalAct(a.dataset.ev); });
   $('evalStart').addEventListener('click', e => { const a = e.target.closest('[data-ev]'); if (a) evalAct(a.dataset.ev, a); });

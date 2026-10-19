@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>나도 작곡가 평가 · 선생님용 구글폼 자동 만들기</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#1c2230;--muted:#5d6678;--line:#d9deea;--acc:#2f4fd8}
+@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1a1f2b;--ink:#e8ecf5;--muted:#9aa4b8;--line:#2c3446;--acc:#7d97ff}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Noto Sans KR",sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:24px;margin:0 0 4px}.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:14px 0}
+.card h2{font-size:17px;margin:0 0 6px}ol{padding-left:20px;margin:6px 0}li{margin:4px 0}
+button{font:inherit;background:var(--acc);color:#fff;border:0;border-radius:10px;padding:8px 16px;cursor:pointer}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:340px;font-size:12.5px;line-height:1.5;margin:8px 0}
+.note{color:var(--muted);font-size:14px}code{background:var(--bg);padding:1px 5px;border-radius:5px}
+a{color:var(--acc)}
+</style></head><body><main>
+<h1>구글폼으로 평가 결과 받기</h1>
+<p class="sub">선생님 구글 계정에서 한 번만 하면 돼요. 폼 만들기·응답 시트 연결·학생용 주소 만들기를 자동으로 해 줘요.</p>
+<div class="card"><h2>① 스프레드시트에 코드 붙여 넣기</h2><ol>
+<li><a href="https://sheets.new" target="_blank" rel="noopener">새 구글 스프레드시트</a>를 열어요. (평가 결과가 쌓일 시트예요)</li>
+<li>메뉴 <b>확장 프로그램 → Apps Script</b>를 눌러요.</li>
+<li>기존 코드를 모두 지우고 아래 코드를 붙여 넣은 뒤 💾(저장)을 눌러요.</li></ol>
+<button id="cp" type="button">📋 코드 복사</button>
+<pre id="code">/* 나도 작곡가 평가 — 구글폼 자동 만들기
+ * 구글 스프레드시트 → 확장 프로그램 → Apps Script 에 붙여 넣고, 「평가폼만들기」를 한 번 실행하세요.
+ * 폼을 만들고, 응답이 이 스프레드시트에 쌓이도록 연결하고, 학생용 주소를 &#x27;학생용 주소&#x27; 시트에 적어 줘요. */
+const SITE = &#x27;https://eumflix.github.io/makemusic2/eval.html&#x27;;
+
+// [문항 제목, 앱이 알아보는 낱말, 긴 글 여부]
+const FIELDS = [
+  [&#x27;이름&#x27;, &#x27;이름&#x27;, false], [&#x27;반&#x27;, &#x27;반&#x27;, false], [&#x27;레벨&#x27;, &#x27;레벨&#x27;, false], [&#x27;마디&#x27;, &#x27;마디&#x27;, false], [&#x27;총점&#x27;, &#x27;총점&#x27;, false],
+  [&#x27;코드 정답률&#x27;, &#x27;코드&#x27;, false], [&#x27;음 정답률&#x27;, &#x27;음&#x27;, false], [&#x27;리듬 정답률&#x27;, &#x27;리듬&#x27;, false], [&#x27;화면 이탈&#x27;, &#x27;이탈&#x27;, false],
+  [&#x27;총평&#x27;, &#x27;총평&#x27;, true], [&#x27;결과 전문&#x27;, &#x27;결과&#x27;, true], [&#x27;제출시각&#x27;, &#x27;시각&#x27;, false]
+];
+const KEYS = { &#x27;이름&#x27;: &#x27;name&#x27;, &#x27;반&#x27;: &#x27;klass&#x27;, &#x27;레벨&#x27;: &#x27;level&#x27;, &#x27;마디&#x27;: &#x27;bars&#x27;, &#x27;총점&#x27;: &#x27;score&#x27;, &#x27;코드&#x27;: &#x27;accChord&#x27;, &#x27;음&#x27;: &#x27;accNote&#x27;, &#x27;리듬&#x27;: &#x27;accRhythm&#x27;, &#x27;이탈&#x27;: &#x27;away&#x27;, &#x27;총평&#x27;: &#x27;comment&#x27;, &#x27;결과&#x27;: &#x27;text&#x27;, &#x27;시각&#x27;: &#x27;at&#x27; };
+
+function onOpen() {
+  try { SpreadsheetApp.getUi().createMenu(&#x27;나도 작곡가&#x27;).addItem(&#x27;평가 폼 만들기&#x27;, &#x27;평가폼만들기&#x27;).addToUi(); } catch (e) {}
+}
+
+function 평가폼만들기() {
+  const form = FormApp.create(&#x27;나도 작곡가 평가 결과&#x27;);
+  form.setDescription(&#x27;학생이 평가를 마치면 결과가 자동으로 이곳에 쌓여요. 이 폼 주소는 학생에게 알려 주지 않아도 돼요.&#x27;);
+  try { form.setCollectEmail(false); } catch (e) {}
+  try { form.setLimitOneResponsePerUser(false); } catch (e) {}
+  try { form.setRequireLogin(false); } catch (e) {}
+  try { form.setConfirmationMessage(&#x27;제출되었습니다.&#x27;); } catch (e) {}
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.create(&#x27;나도 작곡가 평가 결과&#x27;);
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());      // 응답이 이 스프레드시트에 쌓여요
+
+  const pre = form.createResponse();                                          // 「양식 미리 작성」과 같은 방식으로 문항 번호를 알아내요
+  FIELDS.forEach(f =&gt; {
+    const it = f[2] ? form.addParagraphTextItem() : form.addTextItem();
+    it.setTitle(f[0]);
+    pre.withItemResponse(f[2] ? it.asParagraphTextItem().createResponse(f[1]) : it.asTextItem().createResponse(f[1]));
+  });
+
+  const link = pre.toPrefilledUrl(), id = (link.match(/\/forms\/d\/e\/([^\/]+)/) || [])[1], map = {};
+  const q = link.split(&#x27;?&#x27;)[1] || &#x27;&#x27;;
+  q.split(&#x27;&amp;&#x27;).forEach(p =&gt; { const m = p.match(/^entry\.(\d+)=(.*)$/); if (m) { const k = KEYS[decodeURIComponent(m[2].replace(/\+/g, &#x27; &#x27;))]; if (k) map[m[1]] = k; } });
+  if (!id || !Object.keys(map).length) throw new Error(&#x27;폼 주소를 읽지 못했어요. 다시 실행해 주세요.&#x27;);
+
+  const code = Utilities.base64EncodeWebSafe(JSON.stringify({ i: id, m: map })).replace(/=+$/, &#x27;&#x27;);
+  const url = SITE + &#x27;?f=&#x27; + code;
+
+  const sh = ss.getSheetByName(&#x27;학생용 주소&#x27;) || ss.insertSheet(&#x27;학생용 주소&#x27;);
+  sh.clear(); sh.getRange(&#x27;A1&#x27;).setValue(&#x27;학생에게 나눠 줄 주소 (평가 화면)&#x27;); sh.getRange(&#x27;A2&#x27;).setValue(url);
+  sh.getRange(&#x27;A4&#x27;).setValue(&#x27;응답 폼(선생님용)&#x27;); sh.getRange(&#x27;A5&#x27;).setValue(form.getEditUrl());
+  sh.setColumnWidth(1, 640);
+  try { SpreadsheetApp.getUi().alert(&#x27;완료!\n\n「학생용 주소」 시트의 A2 칸 주소를 학생들에게 나눠 주세요.\n제출된 결과는 이 스프레드시트의 「양식 응답」 시트에 쌓여요.&#x27;); } catch (e) {}
+  return url;
+}
+</pre></div>
+<div class="card"><h2>② 한 번 실행하기</h2><ol>
+<li>위쪽 함수 선택에서 <b>평가폼만들기</b>를 고르고 <b>▶ 실행</b>을 눌러요.</li>
+<li>「권한 검토」 창이 뜨면 본인 계정을 고르고, <b>Google에서 확인하지 않은 앱</b> 화면이 나오면 <b>고급 → (프로젝트 이름)(안전하지 않음)으로 이동 → 허용</b>을 눌러요. 선생님 본인의 시트와 폼만 다루는 코드예요.</li>
+<li>끝나면 스프레드시트에 <b>학생용 주소</b> 시트가 생겨요. <b>A2 칸의 주소</b>를 학생들에게 나눠 주면 끝이에요.</li></ol></div>
+<div class="card"><h2>결과는 어디서 봐요?</h2><p>학생이 제출하면 같은 스프레드시트의 <b>「양식 응답」 시트</b>에 한 줄씩 쌓여요. (이름 · 반 · 레벨 · 총점 · 정답률 · 화면 이탈 · 총평 · 결과 전문)</p>
+<p class="note">구글 보안 때문에 앱은 전송이 성공했는지 확인하지 못해요. 처음에는 선생님이 직접 한 번 제출해서 시트에 들어오는지 확인해 보세요. 이미 만든 구글폼이 있다면 <a href="eval.html?setup=1">평가 화면의 「구글폼으로 결과 받기」</a>에 「양식 미리 작성」 링크를 붙여 넣는 방법도 있어요.</p></div>
+</main>
+<script>document.getElementById('cp').onclick=function(){var t=document.getElementById('code').textContent;try{navigator.clipboard.writeText(t).then(function(){document.getElementById('cp').textContent='✓ 복사했어요'})}catch(e){var r=document.createRange();r.selectNode(document.getElementById('code'));getSelection().removeAllRanges();getSelection().addRange(r);document.execCommand('copy')}}</script>
+</body></html>
