@@ -184,7 +184,7 @@ details.more[open]{flex:1 1 100%}
 .legend .l-off{background:var(--kwhite-off)}
 .legend .l-prev{background:var(--accent);border-radius:50%;border-color:var(--accent)}
 .acts{display:flex;flex-wrap:wrap;gap:8px}
-.exp{position:relative}
+.exp{position:relative}.acts .exp:not([hidden]){display:contents}
 .expmenu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:240px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.2);display:grid}
 .expmenu button{text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:8px;font-size:14px}
 .expmenu button:hover{background:var(--surface2)}
@@ -614,8 +614,7 @@ body[data-phase="start"] .dock,body[data-phase="start"] .scorecard,body[data-pha
     <p class="scorehint" id="scoreHint" hidden></p>
     <div class="score" id="score"></div>
     <div id="summary"></div>
-    <div class="sc-foot wr-only"><div class="exp" id="expWrap" hidden><button class="btn sm" id="btnExp" type="button">내보내기</button></div></div>
-  </section>
+      </section>
   <section class="levelup" id="levelup" hidden></section>
 </div>
 
@@ -632,7 +631,7 @@ body[data-phase="start"] .dock,body[data-phase="start"] .scorecard,body[data-pha
     <div class="visw wr-only" id="visWrap" hidden></div>
     <div class="kbrow" id="kbRow"><button class="octb" id="octDn" type="button" aria-label="낮은 옥타브" hidden>◀<small>옥타브</small></button><div class="kbwrap" id="kbWrap"><div class="kb" id="kb"></div></div><button class="octb" id="octUp" type="button" aria-label="높은 옥타브" hidden>▶<small>옥타브</small></button></div>
     <div class="legend" id="legend"></div>
-    <div class="acts wr-only"><button class="btn sm" id="btnErase2" type="button">⌫ 음 지우기</button><button class="btn sm" id="btnUndo" type="button">↶ 되돌리기</button><button class="btn sm" id="btnClearBar" type="button">마디 비우기</button><button class="btn sm" id="btnClear" type="button">처음부터 다시</button><button class="btn sm gen-only" id="btnRest" type="button">쉼표 넣기</button><button class="btn sm gen-only" id="btnChordPlan" type="button">🎼 코드 진행 정하기</button></div>
+    <div class="acts wr-only"><button class="btn sm" id="btnErase2" type="button">⌫ 음 지우기</button><button class="btn sm" id="btnUndo" type="button">↶ 되돌리기</button><button class="btn sm" id="btnClearBar" type="button">마디 비우기</button><button class="btn sm" id="btnClear" type="button">처음부터 다시</button><span class="exp" id="expWrap" hidden><button class="btn sm" id="btnExp" type="button">⬇ 내보내기</button></span><button class="btn sm gen-only" id="btnRest" type="button">쉼표 넣기</button><button class="btn sm gen-only" id="btnChordPlan" type="button">🎼 코드 진행 정하기</button></div>
     <div class="playrow"><button class="btn pri" id="btnPlayBar" type="button">▶ 이 마디 들어보기</button><button class="btn pri" id="btnPlay2" type="button">▶ 처음부터 들어보기</button></div>
   </div>
 </section>
@@ -3047,7 +3046,16 @@ const SAMPLE = [[60,2],[64,2],[67,2],[64,2],[69,2],[67,2],[64,4],[65,2],[69,2],[
 SAMPLE.splice(21, 5, { p: 69, d: 2 }, { p: 65, d: 2 }, { p: 64, d: 2 }, { p: 62, d: 2 });   // 7마디는 레로 끝나요 (마지막 도로 이어지게)
 SAMPLE.push({ p: 60, d: 8 });
 const EVAL = false;                                // 평가용 빌드에서는 true (build_eval.sh)
-let DL = null, scoreMeta = null, flashT = 0, pendingScroll = false;
+let DL = {
+  web: true,
+  async save({ filename, data }) {
+    const blob = data instanceof Blob ? data : new Blob([data], typeof data === 'string' ? { type: 'text/plain;charset=utf-8' } : {});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.hidden = true;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+    return { status: 'saved' };
+  }
+}, scoreMeta = null, flashT = 0, pendingScroll = false;
 const GEN = 5;                                   // 레벨5 = 자유 작곡 (조성·박자·음표 길이 자유)
 const isBG = () => S.level >= 1 && S.level < GEN;
 const isL0 = () => S.level === 0;
@@ -4779,14 +4787,42 @@ async function wavBlob() {                       // 기다리지 않고 한 번�
 }
 const XF = {
   wav: { l: '소리(wav)', ext: 'wav', d: '지금 고른 악기(건반·베이스·드럼)와 빠르기 그대로 소리 파일(wav)로 만들어요.' },
+  png: { l: '악보(PNG)', ext: 'png', d: '악보를 그림 파일(PNG)로 저장해요. 화면 캡처보다 선명해요.' },
+  jpg: { l: '악보(JPG)', ext: 'jpg', d: '악보를 그림 파일(JPG)로 저장해요. 용량이 작아 메신저로 보내기 좋아요.' },
+  pdf: { l: '악보(PDF)', ext: 'pdf', d: '인쇄하기 좋은 A4 악보(PDF)로 저장해요.' },
   svg: { l: '악보(SVG)', ext: 'svg', d: '코드 이름이 들어간 악보 그림 파일(SVG)로 저장해요.' },
   zip: { l: 'MIDI+악보', ext: 'zip', d: '멜로디와 화음 반주 MIDI, MusicXML(코드 기호)을 zip 하나로 담아요.' }
 };
+async function scoreRaster(fmt) {              // 악보 SVG -> 캔버스 -> PNG/JPG/PDF(A4 세로)
+  const svg = buildExportSvg(1000), vb = svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/), sw = +vb[1], sh = +vb[2];
+  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  await new Promise((ok, no) => { img.onload = ok; img.onerror = no; });
+  const cv = document.createElement('canvas'), c = cv.getContext('2d');
+  const q = (t, a) => new Promise(r => cv.toBlob(r, t, a));
+  if (fmt === 'png' || fmt === 'jpg') {
+    cv.width = sw * 2.4; cv.height = sh * 2.4; c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height); c.drawImage(img, 0, 0, cv.width, cv.height);
+    return await q(fmt === 'png' ? 'image/png' : 'image/jpeg', .93);
+  }
+  const PW = 1654, PH = 2339, M = 110; cv.width = PW; cv.height = PH; c.fillStyle = '#fff'; c.fillRect(0, 0, PW, PH);
+  let w = PW - 2 * M, h = w * sh / sw; if (h > PH - 2 * M) { h = PH - 2 * M; w = h * sw / sh; }
+  c.drawImage(img, (PW - w) / 2, M, w, h);
+  const jpg = new Uint8Array(await (await q('image/jpeg', .93)).arrayBuffer());
+  const enc = t => new TextEncoder().encode(t), ch = [], off = []; let len = 0;
+  const push = u => { ch.push(u); len += u.length; };
+  const obj = (n, body, st) => { off[n] = len; push(enc(n + ' 0 obj\n' + body)); if (st) { push(st); push(enc('\nendstream')); } push(enc('\nendobj\n')); };
+  push(enc('%PDF-1.4\n'));
+  obj(1, '<</Type/Catalog/Pages 2 0 R>>'); obj(2, '<</Type/Pages/Kids[3 0 R]/Count 1>>');
+  obj(3, '<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</XObject<</Im0 5 0 R>>>>/Contents 4 0 R>>');
+  const cs = 'q 595 0 0 842 0 0 cm /Im0 Do Q'; obj(4, '<</Length ' + cs.length + '>>\nstream\n' + cs + '\nendstream');
+  obj(5, '<</Type/XObject/Subtype/Image/Width ' + PW + '/Height ' + PH + '/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ' + jpg.length + '>>\nstream\n', jpg);
+  const xo = len; push(enc('xref\n0 6\n0000000000 65535 f \n' + [1, 2, 3, 4, 5].map(n => String(off[n]).padStart(10, '0') + ' 00000 n \n').join('') + 'trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n' + xo + '\n%%EOF'));
+  return new Blob(ch, { type: 'application/pdf' });
+}
 function openExport() {
   if (document.querySelector('.expmodal') || !S.key || !S.events.length || (isBG() && !melDone(S))) return;
   stopPlay(); let fmt = 'wav', busy = false;
   const m = document.createElement('div'); m.className = 'modal expmodal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', '음악 내보내기');
-  m.innerHTML = '<div class="mbox"><h2 style="margin-bottom:10px">내보내기</h2><div class="seg" id="xfmt" style="display:flex;margin-bottom:10px">' + Object.keys(XF).map(k => '<button type="button" data-f="' + k + '" aria-pressed="' + (k === fmt) + '" style="flex:1">' + XF[k].l + '</button>').join('') + '</div>' +
+  m.innerHTML = '<div class="mbox"><h2 style="margin-bottom:10px">내보내기</h2><div class="seg" id="xfmt" style="display:flex;flex-wrap:wrap;margin-bottom:10px">' + Object.keys(XF).map(k => '<button type="button" data-f="' + k + '" aria-pressed="' + (k === fmt) + '" style="flex:1 1 30%">' + XF[k].l + '</button>').join('') + '</div>' +
     '<p id="xmsg"></p><input class="xin" id="xtitle" type="text" maxlength="30" aria-label="파일 이름" value="' + fileBase().replace(/"/g, '') + '"><div id="xres"></div><div class="mbtns"><button class="btn" type="button" id="xno">닫기</button><button class="btn pri" type="button" id="xok">만들기</button></div></div>';
   document.body.appendChild(m);
   const msg = m.querySelector('#xmsg'), ok = m.querySelector('#xok'), no = m.querySelector('#xno'), inp = m.querySelector('#xtitle'), res = m.querySelector('#xres');
@@ -4801,7 +4837,7 @@ function openExport() {
     const base = (inp.value.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim() || '내 멜로디').slice(0, 30), fn = base + '.' + XF[fmt].ext;
     lock(true); msg.textContent = fmt === 'wav' ? '소리를 만드는 중…' : '파일을 만드는 중…';
     let blob = null;
-    try { blob = fmt === 'wav' ? await wavBlob() : fmt === 'svg' ? new Blob([svgData()], { type: 'image/svg+xml' }) : new Blob([zipData()], { type: 'application/zip' }); } catch (e) { blob = null; }
+    try { blob = fmt === 'wav' ? await wavBlob() : fmt === 'svg' ? new Blob([svgData()], { type: 'image/svg+xml' }) : (fmt === 'png' || fmt === 'jpg' || fmt === 'pdf') ? await scoreRaster(fmt) : new Blob([zipData()], { type: 'application/zip' }); } catch (e) { blob = null; }
     lock(false);
     if (!blob || !blob.size) { msg.textContent = '파일을 만들지 못했어요. 다시 시도해 주세요.'; return; }
     if (DL) {                                      // claude.ai 화면: 저장 기능으로 바로 저장
@@ -5515,7 +5551,7 @@ $('levelup').addEventListener('click', e => { if (e.target.id === 'btnLevelUp' &
 $('btnName').onclick = () => { S.label = S.label === 'english' ? 'solfege' : 'english'; save(); renderAll(); };
 $('btnNcGo').onclick = () => promote(3);
 $('btnLeapGo').onclick = () => promote(4);
-const SHARE_URL = 'https://claude.ai/artifact/9hB433rkdUggg8kUfrg4PJ';
+const SHARE_URL = 'https://eumflix.github.io/makemusic/';
 function openQR(url, head, sub) {
   url = typeof url === 'string' ? url : SHARE_URL; const own = url === SHARE_URL;
   if (document.querySelector('.qrmodal')) return;
